@@ -1,0 +1,76 @@
+package trade
+
+import (
+	"gorm.io/gorm"
+	"time"
+)
+
+const TradesTableName = "trades"
+const StatusActive = "active"
+const StatusClosed = "closed"
+
+
+// Trade - represents trade instance
+type Trade struct {
+	ID int `json:"id" gorm:"column:id"`
+	Pair string `json:"pair" gorm:"column:pair"`
+	StrategyID int `json:"strategyID" gorm:"column:strategy_id"`
+	InstanceID int `json:"instanceID" gorm:"column:instance_id"`
+	UserID int `json:"userID" gorm:"column:user_id"`
+	IsFutures bool `json:"isFutures" gorm:"column:is_futures"`
+	PriceBuy float64 `json:"priceBuy" gorm:"column:price_buy"`
+	PriceSell float64 `json:"priceSell" gorm:"column:price_sell"`
+	USD float64 `json:"usd" gorm:"column:usd"`
+	Quantity float64 `json:"quantity" gorm:"column:quantity"`
+	Profit float64 `json:"profit" gorm:"column:profit"`
+	ROI float64 `json:"roi" gorm:"column:roi"`
+	Status string `json:"status" gorm:"column:status"`
+	TimeStamp time.Time `json:"-" gorm:"column:time_stamp"`
+	TimeString string `json:"time" gorm:"-"`
+}
+
+func (t *Trade) TableName() string {
+	return TradesTableName
+}
+
+func (t *Trade) ConvertTime() {
+	t.TimeString = t.TimeStamp.Format("15:04:05  02.01.06")
+}
+
+// NewTrade - creates new trade for given user with params
+func NewTrade(db *gorm.DB, trade Trade) (*Trade, error) {
+	err := db.Create(&trade).Error
+	if err != nil {
+		return nil, err
+	}
+	return &trade, nil
+}
+
+// CloseTrade - closes trade with price
+func CloseTrade(db *gorm.DB, trade *Trade) error {
+	err := db.Save(&trade).Error
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+// GetTradesForUser - returns list of trades for given user
+func GetTradesForUser(db *gorm.DB, userID int) ([]*Trade, error) {
+	var trades []*Trade
+	err := db.Where("user_id = ?", userID).Find(&trades).Error
+	if err != nil {
+		return nil, err
+	}
+	return trades, nil
+}
+
+// GetTradesByInstanceID - returns trades list for given instance
+func GetTradesByInstanceID(db *gorm.DB, userID, instanceID int) ([]*Trade, error) {
+	var trades []*Trade
+	err := db.Where("user_id = ? AND instance_id = ?", userID, instanceID).Find(&trades).Error
+	if err != nil {
+		return nil, err
+	}
+	return trades, nil
+}
