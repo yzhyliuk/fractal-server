@@ -18,8 +18,6 @@ CREATE TABLE public.strategy_info (
 );
 
 INSERT INTO public.strategy_info(name, description) VALUES ('Moving Average Crossover','A simple moving average crossover strategy. Buy if short term MA is higher than long term MA. Sell if short term MA below long term MA.');
-INSERT INTO public.strategy_info(name, description) VALUES ('RSI crossover','Strategy based on RSI indicator. Buy on current RSI is over 14 days EMA RSI. Sell on current RSI lover than 14 days EMA RSI');
-INSERT INTO public.strategy_info(name, description) VALUES ('Standard deviation','Use SD to detect extreme price drops and rises in expectation on trend reversal');
 INSERT INTO public.strategy_info(id, name, description) VALUES (0, 'DEFAULT_TEMPLATE','');
 
 CREATE TABLE public.strategy_fields(
@@ -40,7 +38,9 @@ INSERT INTO public.strategy_fields(strategy_id, name, display_name, description,
     VALUES (0,'pair','Pair','Some of Spot trading pairs may be unavailable on Futures and vise versa.', NULL, NULL, 'BTCUSDT','string','modal-select','getAllPairs'),
            (0,'bid','Bid Size','Minimal bid on Binance is 11$', 11, NULL, '11','number','input',NULL),
            (0,'timeFrame','Time Frame Duration','Duration of time frame equals to one bar on barchart.', NULL, NULL, '1','number','select','1 minute:1!!3 minutes:3!!5 minutes:5!!15 minutes:15!!30 minutes:30!!1 hour:60'),
-           (0, 'isFutures', 'Trading futures',' Leverage of asset will be set to binance default. Go to binance to change it.', NULL, NULL, 'false','bool','checkbox', NULL);
+           (0, 'isFutures', 'Trading futures',' Leverage of asset will be set to binance default. Go to binance to change it.', NULL, NULL, 'false','bool','checkbox', NULL),
+           (1,'longTerm','Long Term Period','Number of periods for long term moving average calculation.',2,NULL,25,'number','input',NULL),
+           (2,'shortTerm','Short Term Period','Number of periods for short term moving average calculation.',1,NULL,7,'number','input', NULL);
 
 CREATE TABLE strategy_instances (
     id SERIAL PRIMARY KEY,
@@ -85,7 +85,3 @@ SELECT
        (select count(id)::decimal from public.trades where instance_id = instance.id and profit > 0)/(select CASE WHEN count(id) = 0 THEN 1 ELSE count(id)::decimal END from public.trades where instance_id = instance.id) as win_rate, instance.is_futures
 FROM public.strategy_instances as instance
          LEFT JOIN strategy_info as strategy on instance.strategy_id = strategy.id;
-
-INSERT INTO public.strategy_info(name, description) VALUES ('Nadaraya-Watson Envelope','Strategy builds upon the previously posted Nadaraya-Watson Estimator.');
-INSERT INTO public.strategy_fields(strategy_id, name, display_name, description, min, max, default_value, type, ui_type, dataset)
-VALUES ((SELECT id FROM public.strategy_info WHERE name = 'Nadaraya-Watson Envelope'),'mul','Multiplier', 'Regression multiplier, recommended values: 1, 2, 3',1,3,3,'number','input', NULL);
