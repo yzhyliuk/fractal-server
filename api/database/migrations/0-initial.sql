@@ -59,26 +59,33 @@ CREATE TABLE public.trades (
     instance_id integer references public.strategy_instances(id) ON DELETE CASCADE,
     user_id integer references public.users(id),
     is_futures bool not null,
-    price_buy numeric not null,
-    price_sell numeric,
+    price_open numeric not null,
+    price_close numeric,
     usd numeric not null,
     quantity numeric not null,
     profit numeric,
     roi numeric,
     status varchar(25),
-    time_stamp timestamp without time zone
+    time_stamp timestamp without time zone,
+    futures_side varchar(20) not null
 );
 
+CREATE TABLE public.instance_data (
+                                      instance_id int references public.strategy_instances(id) on DELETE cascade,
+                                      data jsonb
+);
+
+ALTER TABLE public.strategy_instances ADD COLUMN
+    is_futures boolean not null DEFAULT false;
 
 CREATE OR REPLACE VIEW public.strategy_instance_monitoring AS
 SELECT
     instance.id, instance.strategy_id, instance.user_id, instance.pair, instance.bid,
     instance.time_frame, instance.status, strategy.name, (select sum(profit) as profit from public.trades where instance_id = instance.id),
-       (select count(id)::decimal from public.trades where instance_id = instance.id and profit > 0)/(select CASE WHEN count(id) = 0 THEN 1 ELSE count(id)::decimal END from public.trades where instance_id = instance.id) as win_rate
+       (select count(id)::decimal from public.trades where instance_id = instance.id and profit > 0)/(select CASE WHEN count(id) = 0 THEN 1 ELSE count(id)::decimal END from public.trades where instance_id = instance.id) as win_rate, instance.is_futures
 FROM public.strategy_instances as instance
          LEFT JOIN strategy_info as strategy on instance.strategy_id = strategy.id;
 
-CREATE TABLE public.instance_data (
-    instance_id int references public.strategy_instances(id) on DELETE cascade,
-    data jsonb
-)
+INSERT INTO public.strategy_info(name, description) VALUES ('Nadaraya-Watson Envelope','Strategy builds upon the previously posted Nadaraya-Watson Estimator.');
+INSERT INTO public.strategy_fields(strategy_id, name, display_name, description, min, max, default_value, type, ui_type, dataset)
+VALUES ((SELECT id FROM public.strategy_info WHERE name = 'Nadaraya-Watson Envelope'),'mul','Multiplier', 'Regression multiplier, recommended values: 1, 2, 3',1,3,3,'number','input', NULL);

@@ -52,14 +52,23 @@ func (s *StrategyController) GetStrategyFields(c *fiber.Ctx) error  {
 
 func (s *StrategyController) GetPairs(c *fiber.Ctx) error {
 	filter := c.Query("filter")
+	typeOfPairs := c.Query("type")
 
 	var tradingPairs = make([]apimodels.TradingPair, 0)
 
-	if filter == "" {
-		return c.JSON(common.SpotTradingPairs)
+	tradingPairsSource := make([]apimodels.TradingPair, 0)
+
+	if typeOfPairs == "futures" {
+		tradingPairsSource = common.FuturesTradingPairs
+	} else  {
+		tradingPairsSource = common.SpotTradingPairs
 	}
 
-	for _, pair := range common.SpotTradingPairs {
+	if filter == "" {
+		return c.JSON(tradingPairsSource)
+	}
+
+	for _, pair := range tradingPairsSource {
 		if strings.Contains(pair.Value, filter) {
 			tradingPairs = append(tradingPairs, pair)
 		}

@@ -7,7 +7,7 @@ import (
 	"newTradingBot/api/middleware/jwt"
 )
 
-func StartServer() error {
+func StartServer() (*fiber.App, error) {
 	app := fiber.New()
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:3000",
@@ -20,7 +20,7 @@ func StartServer() error {
 
 	establishRoutes(app)
 
-	return app.Listen(":8080")
+	return app, app.Listen(":8080")
 }
 
 func establishRoutes(app *fiber.App)  {

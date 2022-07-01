@@ -1,7 +1,9 @@
 package common
 
-import "newTradingBot/strategies/mac"
+import (
+	"newTradingBot/strategies/nadaraya-watsons"
+)
 
 var RunStrategy = map[int]func(userID int, rawConfig []byte) error{
-	1: mac.RunMovingAverageCrossover,
+	1: nadaraya_watsons.RunMovingAverageCrossover,
 }
