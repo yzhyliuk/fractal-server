@@ -1,6 +1,7 @@
 package trade
 
 import (
+	"github.com/adshao/go-binance/v2/futures"
 	"gorm.io/gorm"
 	"time"
 )
@@ -17,16 +18,18 @@ type Trade struct {
 	StrategyID int `json:"strategyID" gorm:"column:strategy_id"`
 	InstanceID int `json:"instanceID" gorm:"column:instance_id"`
 	UserID int `json:"userID" gorm:"column:user_id"`
-	IsFutures bool `json:"isFutures" gorm:"column:is_futures"`
-	PriceBuy float64 `json:"priceBuy" gorm:"column:price_buy"`
-	PriceSell float64 `json:"priceSell" gorm:"column:price_sell"`
-	USD float64 `json:"usd" gorm:"column:usd"`
+	IsFutures bool    `json:"isFutures" gorm:"column:is_futures"`
+	PriceOpen  float64 `json:"priceOpen" gorm:"column:price_open"`
+	PriceClose float64 `json:"priceClose" gorm:"column:price_close"`
+	USD        float64 `json:"usd" gorm:"column:usd"`
 	Quantity float64 `json:"quantity" gorm:"column:quantity"`
 	Profit float64 `json:"profit" gorm:"column:profit"`
 	ROI float64 `json:"roi" gorm:"column:roi"`
 	Status string `json:"status" gorm:"column:status"`
 	TimeStamp time.Time `json:"-" gorm:"column:time_stamp"`
 	TimeString string `json:"time" gorm:"-"`
+	BinanceOrderID int64 `json:"-" gorm:"-"`
+	FuturesSide futures.SideType `json:"futuresSide" gorm:"column:futures_side"`
 }
 
 func (t *Trade) TableName() string {
@@ -68,7 +71,7 @@ func GetTradesForUser(db *gorm.DB, userID int) ([]*Trade, error) {
 // GetTradesByInstanceID - returns trades list for given instance
 func GetTradesByInstanceID(db *gorm.DB, userID, instanceID int) ([]*Trade, error) {
 	var trades []*Trade
-	err := db.Where("user_id = ? AND instance_id = ?", userID, instanceID).Find(&trades).Error
+	err := db.Where("user_id = ? AND instance_id = ?", userID, instanceID).Order("id desc").Find(&trades).Error
 	if err != nil {
 		return nil, err
 	}

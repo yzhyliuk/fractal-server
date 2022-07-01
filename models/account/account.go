@@ -16,8 +16,8 @@ type Account interface {
 	GetBalance(symbol string) float64
 	PlaceMarketOrder(sum float64, symbol string, side binance.SideType, inst *instance.StrategyInstance, prevTrade *trade.Trade) (*trade.Trade, error)
 	// PlaceLimitOrder(sum, price float64,symbol string, side binance.SideType) (*trade.Trade, error)
-	OpenFuturesPosition(stopLoss, amount float64, takeProfits []TakeProfit, symbol string, side futures.SideType) (*futures.CreateOrderResponse, error)
-	CloseFuturesPosition()
+	OpenFuturesPosition(amount float64, symbol string, side futures.SideType, inst *instance.StrategyInstance) (*trade.Trade, error)
+	CloseFuturesPosition(tradeFutures *trade.Trade) (*trade.Trade, error)
 }
 
 type TakeProfit struct {
@@ -102,15 +102,15 @@ func (b *BinanceAccount) PlaceMarketOrder(sum float64, symbol string, side binan
 	if prevTrade == nil {
 		spotTrade = &trade.Trade{
 			InstanceID: inst.ID,
-			UserID: inst.UserID,
+			UserID:     inst.UserID,
 			StrategyID: inst.StrategyID,
-			Pair: symbol,
-			USD: quantityFloat*price,
-			IsFutures: false,
-			PriceBuy: price,
-			Quantity: quantityFloat,
-			TimeStamp: time.Now(),
-			Status: trade.StatusActive,
+			Pair:       symbol,
+			USD:        quantityFloat*price,
+			IsFutures:  false,
+			PriceOpen:  price,
+			Quantity:   quantityFloat,
+			TimeStamp:  time.Now(),
+			Status:     trade.StatusActive,
 		}
 		spotTrade, err = trade.NewTrade(db, *spotTrade)
 		if err != nil {
@@ -118,12 +118,15 @@ func (b *BinanceAccount) PlaceMarketOrder(sum float64, symbol string, side binan
 		}
 	} else {
 		spotTrade = prevTrade
-		spotTrade.PriceSell = price
+		spotTrade.PriceClose = price
 		spotTrade.Status = trade.StatusClosed
 		spotTrade.Profit = (spotTrade.Quantity*price)-spotTrade.USD
-		spotTrade.ROI = (spotTrade.Quantity*price)/spotTrade.USD-1
+		spotTrade.ROI = spotTrade.Profit/spotTrade.USD
 
 		err = trade.CloseTrade(db, spotTrade)
+		if err != nil {
+			return nil,err
+		}
 	}
 
 	return spotTrade, nil
@@ -142,34 +145,55 @@ func (b *BinanceAccount) PlaceMarketOrder(sum float64, symbol string, side binan
 //	return
 //}
 
-func (b *BinanceAccount) OpenFuturesPosition(stopLoss, amount float64, takeProfits []TakeProfit, symbol string, side futures.SideType) (*futures.CreateOrderResponse, error) {
+func (b *BinanceAccount) OpenFuturesPosition(amount float64, symbol string, side futures.SideType, inst *instance.StrategyInstance) (*trade.Trade, error) {
+
 	quantity := b.formatQuantity(amount, symbol, true)
+
 	res, err := b.futuresClient.NewCreateOrderService().Quantity(quantity).Symbol(symbol).Side(side).Type(futures.OrderTypeMarket).Do(context.Background())
 	if err != nil {
 		return nil, err
 	}
 
-	if side == futures.SideTypeBuy {
-		side = futures.SideTypeSell
-	} else {
-		side = futures.SideTypeBuy
-	}
+	orderID := res.OrderID
 
-	stopPrice := b.formatPrice(stopLoss,symbol)
-	quantity = b.formatQuantity(amount*10,symbol,true)
-	_, err = b.futuresClient.NewCreateOrderService().ReduceOnly(true).TimeInForce(futures.TimeInForceTypeGTC).StopPrice(stopPrice).Quantity(quantity).Symbol(symbol).Side(side).Type(futures.OrderTypeStopMarket).Do(context.Background())
+	order, err := b.futuresClient.NewGetOrderService().Symbol(symbol).OrderID(orderID).Do(context.Background())
 	if err != nil {
-		return  nil, err
+		return nil, err
 	}
 
-	for i := range takeProfits {
-		_, err := b.OpenNewTakeProfitOrder(takeProfits[i], symbol, side)
-		if err != nil {
-			return nil, err
-		}
+	futuresTrade := &trade.Trade{}
+
+	price, err := strconv.ParseFloat(order.AvgPrice, 64)
+	if err != nil {
+		return nil, err
 	}
 
-	return res, nil
+	futuresTrade = &trade.Trade{
+		InstanceID: inst.ID,
+		UserID: inst.UserID,
+		StrategyID: inst.StrategyID,
+		Pair:           symbol,
+		USD:            amount*price,
+		IsFutures:      true,
+		PriceOpen:      price,
+		Quantity:       amount,
+		TimeStamp:      time.Now(),
+		Status:         trade.StatusActive,
+		FuturesSide:    side,
+		BinanceOrderID: orderID,
+	}
+
+	db, err := database.GetDataBaseConnection()
+	if err != nil {
+		return nil, err
+	}
+
+	futuresTrade, err = trade.NewTrade(db, *futuresTrade)
+	if err != nil {
+		return nil, err
+	}
+
+	return futuresTrade, nil
 }
 
 func (b *BinanceAccount) OpenNewTakeProfitOrder(takeProfit TakeProfit, symbol string, side futures.SideType) (*futures.CreateOrderResponse, error) {
@@ -178,8 +202,50 @@ func (b *BinanceAccount) OpenNewTakeProfitOrder(takeProfit TakeProfit, symbol st
 	return b.futuresClient.NewCreateOrderService().ReduceOnly(true).TimeInForce(futures.TimeInForceTypeGTC).StopPrice(price).Quantity(quantity).Symbol(symbol).Side(side).Type(futures.OrderTypeTakeProfitMarket).Do(context.Background())
 }
 
-func (b *BinanceAccount) CloseFuturesPosition() {
+func (b *BinanceAccount) CloseFuturesPosition(futuresTrade *trade.Trade) (*trade.Trade, error) {
+	quantity := b.formatQuantity(futuresTrade.Quantity, futuresTrade.Pair, true)
+	resolvedSide := futures.SideTypeSell
+	if futuresTrade.FuturesSide == futures.SideTypeSell {
+		resolvedSide = futures.SideTypeBuy
+	}
 
+	res, err := b.futuresClient.NewCreateOrderService().Quantity(quantity).Symbol(futuresTrade.Pair).Side(resolvedSide).Type(futures.OrderTypeMarket).Do(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	order, err := b.futuresClient.NewGetOrderService().Symbol(futuresTrade.Pair).OrderID(res.OrderID).Do(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	price, err := strconv.ParseFloat(order.AvgPrice, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	roi := 0.
+	profit := 0.
+
+	switch futuresTrade.FuturesSide {
+	case futures.SideTypeBuy:
+		profit = (futuresTrade.Quantity*price)-futuresTrade.USD
+	case futures.SideTypeSell:
+		profit = (futuresTrade.Quantity*futuresTrade.PriceOpen)-(futuresTrade.Quantity*price)
+	}
+
+	roi = profit / futuresTrade.USD
+
+	futuresTrade.PriceClose = price
+	futuresTrade.Status = trade.StatusClosed
+	futuresTrade.Profit = profit
+	futuresTrade.ROI = roi
+
+	db, err := database.GetDataBaseConnection()
+
+	err = trade.CloseTrade(db, futuresTrade)
+
+	return futuresTrade, err
 }
 
 func (b *BinanceAccount) formatQuantity(sum float64, symbol string, isFutures bool) string {
