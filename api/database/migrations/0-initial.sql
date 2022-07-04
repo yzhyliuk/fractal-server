@@ -40,7 +40,8 @@ INSERT INTO public.strategy_fields(strategy_id, name, display_name, description,
            (0,'timeFrame','Time Frame Duration','Duration of time frame equals to one bar on barchart.', NULL, NULL, '1','number','select','1 minute:1!!3 minutes:3!!5 minutes:5!!15 minutes:15!!30 minutes:30!!1 hour:60'),
            (0, 'isFutures', 'Trading futures',' Leverage of asset will be set to binance default. Go to binance to change it.', NULL, NULL, 'false','bool','checkbox', NULL),
            (1,'longTerm','Long Term Period','Number of periods for long term moving average calculation.',2,NULL,25,'number','input',NULL),
-           (1,'shortTerm','Short Term Period','Number of periods for short term moving average calculation.',1,NULL,7,'number','input', NULL);
+           (1,'shortTerm','Short Term Period','Number of periods for short term moving average calculation.',1,NULL,7,'number','input', NULL),
+           (1,'maType','Moving Average Type',NULL, NULL,NULL,'sma','string','select', 'Exponential MA:ema!!Simple MA:sma');
 
 CREATE TABLE strategy_instances (
     id SERIAL PRIMARY KEY,

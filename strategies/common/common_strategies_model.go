@@ -18,6 +18,7 @@ type Strategy struct {
 	StopSignal chan bool
 	LastTrade *trade.Trade
 
+	Stopped bool
 	HandlerFunction func(marketData *block.Block)
 	DataProcessFunction func(marketData *block.Block)
 }
@@ -30,7 +31,11 @@ func (m *Strategy) Execute()  {
 				return
 			default:
 				marketData := <- m.MonitorChannel
+				if m.Stopped {
+					return
+				}
 				m.DataProcessFunction(marketData)
+				m.HandlerFunction(marketData)
 
 				logs.LogDebug(fmt.Sprintf("Data received by instance #%d", m.StrategyInstance.ID), nil)
 
@@ -139,13 +144,16 @@ func (m *Strategy) closePreviousTrade()  {
 }
 
 func (m *Strategy) Stop()  {
-	m.StopSignal <- true
+	m.Stopped = true
+	go func() { m.StopSignal <- true }()
 
-	if m.LastTrade != nil {
+	if m.LastTrade != nil && !m.StrategyInstance.IsFutures{
 		err := m.HandleSell(nil)
 		if err != nil {
 			logs.LogDebug("",err)
 		}
+	} else {
+		m.closePreviousTrade()
 	}
 }
 

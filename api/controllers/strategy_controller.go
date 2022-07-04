@@ -136,7 +136,7 @@ func (s *StrategyController) StopStrategy(c *fiber.Ctx) error {
 		return err
 	}
 
-	storage.StrategiesStorage[instanceID].Stop()
+	go storage.StrategiesStorage[instanceID].Stop()
 	delete(storage.StrategiesStorage, instanceID)
 
 	return c.SendStatus(http.StatusOK)

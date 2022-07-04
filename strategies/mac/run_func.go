@@ -28,6 +28,7 @@ func RunMovingAverageCrossover(userID int, rawConfig []byte) error{
 		StrategyID: 1,
 		TimeFrame:  config.TimeFrame,
 		Status:     helpers.Created,
+		IsFutures: config.IsFutures,
 	}
 
 	db, err := database.GetDataBaseConnection()

@@ -57,14 +57,15 @@ func (u *UserController) SetKeys(c *fiber.Ctx) error  {
 		return err
 
 	}
-	keysFromUser := users.Keys{
-		UserID: userInfo.UserID,
-	}
+
+	keysFromUser := users.Keys{}
 
 	err = c.BodyParser(&keysFromUser)
 	if err != nil {
 		return err
 	}
+
+	keysFromUser.UserID = userInfo.UserID
 
 	err = users.SaveUserKeys(u.GetDB(), &keysFromUser)
 	if err != nil {
