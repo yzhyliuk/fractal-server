@@ -1,9 +1,9 @@
 package monitoring
 
 import (
-	"errors"
 	"fmt"
 	"github.com/adshao/go-binance/v2"
+	"github.com/adshao/go-binance/v2/futures"
 	"log"
 	"newTradingBot/logs"
 	block2 "newTradingBot/models/block"
@@ -18,11 +18,10 @@ type BinanceMonitor struct {
 	pause bool
 	stopSignal chan bool
 	subscribers map[int]chan *block2.Block
-
-	historicalData []*block2.Block
+	isFutures bool
 }
 
-func NewBinanceMonitor(symbol string, timeFrameDuration time.Duration) *BinanceMonitor  {
+func NewBinanceMonitor(symbol string, timeFrameDuration time.Duration, isFutures bool) *BinanceMonitor  {
 	var binMonitor BinanceMonitor
 	binMonitor.timeFrameDuration = timeFrameDuration
 	binMonitor.symbol = symbol
@@ -31,10 +30,7 @@ func NewBinanceMonitor(symbol string, timeFrameDuration time.Duration) *BinanceM
 
 	binMonitor.stopSignal = make(chan bool)
 	binMonitor.subscribers = make(map[int]chan *block2.Block)
-
-
-	// Save data for last 24 Hours
-	binMonitor.historicalData = make([]*block2.Block, int(24*time.Hour)/int(timeFrameDuration))
+	binMonitor.isFutures = isFutures
 
 	return &binMonitor
 }
@@ -59,24 +55,16 @@ func (m *BinanceMonitor) NotifyAll(marketData *block2.Block)  {
 	for _, channel := range m.subscribers {
 		channel <- marketData
 	}
+}
 
-	m.historicalData = m.historicalData[1:]
-	m.historicalData = append(m.historicalData, marketData)
+func (m *BinanceMonitor) IsFutures() bool  {
+	return m.isFutures
 }
 
 // Stop - stops binance market monitor
 func (m *BinanceMonitor) Stop()  {
 	m.stopSignal <- true
 	logs.LogDebug(fmt.Sprintf("Binance monitor is STOPPED for %s with %d min. time frame", m.symbol, int(m.timeFrameDuration/time.Minute)), nil)
-}
-
-// GetHistoricalData - returns historical data for given timeframes count
-func (m *BinanceMonitor) GetHistoricalData(timeFrames int) ([]*block2.Block, error) {
-	length := len(m.historicalData)
-	if timeFrames > length {
-		return  nil, errors.New("monitor doesn't contains enough timeframes")
-	}
-	return m.historicalData[length-timeFrames-1:], nil
 }
 
 // RunMonitor - starts monitoring loop
@@ -96,23 +84,45 @@ func (m *BinanceMonitor) RunMonitor()  {
 
 				logs.LogDebug("BINANCE monitor loop started", nil)
 
-				wsAggTradeHandler := func(event *binance.WsAggTradeEvent) {
-					price, _ := strconv.ParseFloat(event.Price, 64)
-					block.Trades = append(block.Trades, price)
-					block.TradesCount++
+				stopC := make(chan struct{})
 
-					quantity, _ := strconv.ParseFloat(event.Quantity, 64)
-					block.Volume += quantity
+				if !m.isFutures {
+					wsAggTradeHandler := func(event *binance.WsAggTradeEvent) {
+						price, _ := strconv.ParseFloat(event.Price, 64)
+						block.Trades = append(block.Trades, price)
+						block.TradesCount++
 
-					if price > block.MaxPrice {
-						block.MaxPrice = price
+						quantity, _ := strconv.ParseFloat(event.Quantity, 64)
+						block.Volume += quantity
+
+						if price > block.MaxPrice {
+							block.MaxPrice = price
+						}
+						if price < block.MinPrice {
+							block.MinPrice = price
+						}
 					}
-					if price < block.MinPrice {
-						block.MinPrice = price
+
+					_, stopC, _ = binance.WsAggTradeServe(m.symbol, wsAggTradeHandler, errHandlerLog)
+				} else {
+					wsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
+						price, _ := strconv.ParseFloat(event.Price, 64)
+						block.Trades = append(block.Trades, price)
+						block.TradesCount++
+
+						quantity, _ := strconv.ParseFloat(event.Quantity, 64)
+						block.Volume += quantity
+
+						if price > block.MaxPrice {
+							block.MaxPrice = price
+						}
+						if price < block.MinPrice {
+							block.MinPrice = price
+						}
 					}
+
+					_, stopC, _ = futures.WsAggTradeServe(m.symbol, wsAggTradeHandler, errHandlerLog)
 				}
-
-				_, stopC, _ := binance.WsAggTradeServe(m.symbol, wsAggTradeHandler, errHandlerLog)
 
 				time.Sleep(m.timeFrameDuration)
 				stopC <- struct{}{}

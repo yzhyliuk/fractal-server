@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"net/http"
 	"newTradingBot/api/common"
@@ -135,6 +136,10 @@ func (s *StrategyController) StopStrategy(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+
+	monitorName := fmt.Sprintf("%s:%d:%t",strategyInstance.Pair, strategyInstance.TimeFrame, strategyInstance.IsFutures)
+
+	storage.MonitorsBinance[monitorName].UnSubscribe(strategyInstance.ID)
 
 	go storage.StrategiesStorage[instanceID].Stop()
 	delete(storage.StrategiesStorage, instanceID)
