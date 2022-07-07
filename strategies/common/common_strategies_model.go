@@ -147,12 +147,16 @@ func (m *Strategy) Stop()  {
 	m.Stopped = true
 	go func() { m.StopSignal <- true }()
 
+	m.CloseAllTrades()
+}
+
+func (m *Strategy) CloseAllTrades() {
 	if m.LastTrade != nil && !m.StrategyInstance.IsFutures{
 		err := m.HandleSell(nil)
 		if err != nil {
 			logs.LogDebug("",err)
 		}
-	} else {
+	} else if m.LastTrade != nil && m.StrategyInstance.IsFutures{
 		m.closePreviousTrade()
 	}
 }

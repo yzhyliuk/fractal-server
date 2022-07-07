@@ -1,4 +1,4 @@
-package template
+package glide_on_price
 
 import (
 	"encoding/json"
@@ -13,8 +13,8 @@ import (
 	"time"
 )
 
-func RunMovingAverageCrossover(userID int, rawConfig []byte) error{
-	var config StrategyTemplateConfig
+func RunGlideOnPrice(userID int, rawConfig []byte) error{
+	var config GlideOnPriceConfig
 
 	err := json.Unmarshal(rawConfig, &config)
 	if err != nil {
@@ -27,6 +27,7 @@ func RunMovingAverageCrossover(userID int, rawConfig []byte) error{
 		UserID:     userID,
 		StrategyID: 1,
 		TimeFrame:  config.TimeFrame,
+		IsFutures: config.IsFutures,
 		Status:     helpers.Created,
 	}
 
@@ -53,7 +54,7 @@ func RunMovingAverageCrossover(userID int, rawConfig []byte) error{
 		storage.MonitorsBinance[monitorName] = monitor
 		storage.MonitorsBinance[monitorName].RunMonitor()
 		monitorChannel = storage.MonitorsBinance[monitorName].Subscribe(inst.ID)
-		observationsData = make([]*block.Block, config.LongTermPeriod)
+		observationsData = make([]*block.Block, config.VolatilityObservationsTimeFrame)
 	}
 
 	keys, err := users.GetUserKeys(db, userID)
@@ -61,7 +62,7 @@ func RunMovingAverageCrossover(userID int, rawConfig []byte) error{
 		return err
 	}
 
-	strat, err := NewTemplateStrategy(monitorChannel, config, &keys, observationsData, inst)
+	strat, err := NewGlideOnPriceStrategy(monitorChannel, config, &keys, observationsData, inst)
 	if err != nil {
 		return err
 	}
