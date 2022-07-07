@@ -5,6 +5,6 @@ import (
 	"newTradingBot/models/strategy"
 )
 
-var SpotMonitorsBinance = make(map[string]*monitoring.BinanceMonitor)
+var MonitorsBinance = make(map[string]*monitoring.BinanceMonitor)
 
 var StrategiesStorage = make(map[int]strategy.Strategy)

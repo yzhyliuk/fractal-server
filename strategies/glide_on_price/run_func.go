@@ -41,20 +41,19 @@ func RunGlideOnPrice(userID int, rawConfig []byte) error{
 		return err
 	}
 
-	monitorName := fmt.Sprintf("%s:%d",config.Pair, config.TimeFrame)
+	monitorName := fmt.Sprintf("%s:%d:%t",config.Pair, config.TimeFrame, inst.IsFutures)
 
 	var monitorChannel chan *block.Block
 
 	var observationsData []*block.Block
 
-	if storage.SpotMonitorsBinance[monitorName] != nil {
-		monitorChannel = storage.SpotMonitorsBinance[monitorName].Subscribe(inst.ID)
-		observationsData, err = storage.SpotMonitorsBinance[monitorName].GetHistoricalData(config.VolatilityObservationsTimeFrame)
+	if storage.MonitorsBinance[monitorName] != nil{
+		monitorChannel = storage.MonitorsBinance[monitorName].Subscribe(inst.ID)
 	} else {
-		monitor := monitoring.NewBinanceMonitor(config.Pair, time.Duration(config.TimeFrame*int(time.Minute)))
-		storage.SpotMonitorsBinance[monitorName] = monitor
-		storage.SpotMonitorsBinance[monitorName].RunMonitor()
-		monitorChannel = storage.SpotMonitorsBinance[monitorName].Subscribe(inst.ID)
+		monitor := monitoring.NewBinanceMonitor(config.Pair, time.Duration(config.TimeFrame*int(time.Minute)),inst.IsFutures)
+		storage.MonitorsBinance[monitorName] = monitor
+		storage.MonitorsBinance[monitorName].RunMonitor()
+		monitorChannel = storage.MonitorsBinance[monitorName].Subscribe(inst.ID)
 		observationsData = make([]*block.Block, config.VolatilityObservationsTimeFrame)
 	}
 
