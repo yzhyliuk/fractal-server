@@ -50,7 +50,7 @@ func RunGlideOnPrice(userID int, rawConfig []byte) error{
 	if storage.MonitorsBinance[monitorName] != nil{
 		monitorChannel = storage.MonitorsBinance[monitorName].Subscribe(inst.ID)
 	} else {
-		monitor := monitoring.NewBinanceMonitor(config.Pair, time.Duration(config.TimeFrame*int(time.Minute)),inst.IsFutures)
+		monitor := monitoring.NewBinanceMonitor(config.Pair, time.Duration(config.TimeFrame*int(time.Second)),inst.IsFutures)
 		storage.MonitorsBinance[monitorName] = monitor
 		storage.MonitorsBinance[monitorName].RunMonitor()
 		monitorChannel = storage.MonitorsBinance[monitorName].Subscribe(inst.ID)

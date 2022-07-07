@@ -24,7 +24,7 @@ func (s StrategyField) TableName() string{
 
 func GetStrategyFields(db *gorm.DB, strategyID int) ([]*StrategyField, error) {
 	var fields []*StrategyField
-	err := db.Where("strategy_id = ?", strategyID).Find(&fields).Error
+	err := db.Where("strategy_id = ?", strategyID).Order("id").Find(&fields).Error
 	if err != nil {
 		return nil, err
 	}
