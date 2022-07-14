@@ -26,6 +26,7 @@ type Trade struct {
 	Profit float64 `json:"profit" gorm:"column:profit"`
 	ROI float64 `json:"roi" gorm:"column:roi"`
 	Status string `json:"status" gorm:"column:status"`
+	Leverage *int `json:"leverage" gorm:"column:leverage"`
 	TimeStamp time.Time `json:"-" gorm:"column:time_stamp"`
 	TimeString string `json:"time" gorm:"-"`
 	BinanceOrderID int64 `json:"-" gorm:"-"`

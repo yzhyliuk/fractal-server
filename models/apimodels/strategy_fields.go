@@ -16,14 +16,18 @@ type StrategyField struct {
 	Type string `json:"type" gorm:"column:type"`
 	UiType string `json:"uiType" gorm:"column:ui_type"`
 	Dataset string `json:"dataset" gorm:"column:dataset"`
+	FuturesOnly bool	`json:"futuresOnly" gorm:"column:futuresonly"`
 }
 
 func (s StrategyField) TableName() string{
 	return tableName
 }
 
-func GetStrategyFields(db *gorm.DB, strategyID int) ([]*StrategyField, error) {
+func GetStrategyFields(db *gorm.DB, strategyID int, futures bool) ([]*StrategyField, error) {
 	var fields []*StrategyField
+	if !futures {
+		db = db.Where("futuresonly = false")
+	}
 	err := db.Where("strategy_id = ?", strategyID).Order("id").Find(&fields).Error
 	if err != nil {
 		return nil, err
@@ -32,7 +36,7 @@ func GetStrategyFields(db *gorm.DB, strategyID int) ([]*StrategyField, error) {
 	return fields, nil
 }
 
-func GetDefaultFields(db *gorm.DB) ([]*StrategyField, error)  {
-	return GetStrategyFields(db, 0)
+func GetDefaultFields(db *gorm.DB,futures bool) ([]*StrategyField, error)  {
+	return GetStrategyFields(db, 0, futures)
 }
 

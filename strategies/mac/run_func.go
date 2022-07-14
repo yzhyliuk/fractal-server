@@ -31,6 +31,10 @@ func RunMovingAverageCrossover(userID int, rawConfig []byte) error{
 		IsFutures: config.IsFutures,
 	}
 
+	if inst.IsFutures {
+		inst.Leverage = config.Leverage
+	}
+
 	db, err := database.GetDataBaseConnection()
 	if err != nil {
 		return err
