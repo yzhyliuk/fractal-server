@@ -31,6 +31,10 @@ func RunGlideOnPrice(userID int, rawConfig []byte) error{
 		Status:     helpers.Created,
 	}
 
+	if inst.IsFutures {
+		inst.Leverage = config.Leverage
+	}
+
 	db, err := database.GetDataBaseConnection()
 	if err != nil {
 		return err

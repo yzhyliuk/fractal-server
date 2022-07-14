@@ -18,6 +18,8 @@ type StrategyController struct {
 	*BaseController
 }
 
+const FuturesType = "futures"
+
 func (s *StrategyController) GetStrategies(c *fiber.Ctx) error  {
 
 	db := s.GetFilteredDB(c)
@@ -36,12 +38,14 @@ func (s *StrategyController) GetStrategyFields(c *fiber.Ctx) error  {
 		return err
 	}
 
-	fields, err := apimodels.GetStrategyFields(s.GetDB(), id)
+	isFutures := c.Query("type") == FuturesType
+
+	fields, err := apimodels.GetStrategyFields(s.GetDB(), id,isFutures)
 	if err != nil {
 		return err
 	}
 
-	defaultFields, err := apimodels.GetDefaultFields(s.GetDB())
+	defaultFields, err := apimodels.GetDefaultFields(s.GetDB(),isFutures)
 	if err != nil {
 		return err
 	}

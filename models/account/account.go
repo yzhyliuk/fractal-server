@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const BinanceFuturesTakerFeeRate = 0.0004
+
 type Account interface {
 	GetBalance(symbol string) float64
 	PlaceMarketOrder(sum float64, symbol string, side binance.SideType, inst *instance.StrategyInstance, prevTrade *trade.Trade) (*trade.Trade, error)
@@ -181,6 +183,7 @@ func (b *BinanceAccount) OpenFuturesPosition(amount float64, symbol string, side
 		Status:         trade.StatusActive,
 		FuturesSide:    side,
 		BinanceOrderID: orderID,
+		Leverage: inst.Leverage,
 	}
 
 	db, err := database.GetDataBaseConnection()
@@ -226,6 +229,7 @@ func (b *BinanceAccount) CloseFuturesPosition(futuresTrade *trade.Trade) (*trade
 
 	roi := 0.
 	profit := 0.
+	fee := futuresTrade.USD*BinanceFuturesTakerFeeRate
 
 	switch futuresTrade.FuturesSide {
 	case futures.SideTypeBuy:
@@ -234,7 +238,9 @@ func (b *BinanceAccount) CloseFuturesPosition(futuresTrade *trade.Trade) (*trade
 		profit = (futuresTrade.Quantity*futuresTrade.PriceOpen)-(futuresTrade.Quantity*price)
 	}
 
-	roi = profit / futuresTrade.USD
+	profit -= 2*fee
+
+	roi = profit / (futuresTrade.USD / float64(*futuresTrade.Leverage))
 
 	futuresTrade.PriceClose = price
 	futuresTrade.Status = trade.StatusClosed

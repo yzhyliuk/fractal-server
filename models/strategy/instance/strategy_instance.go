@@ -19,6 +19,7 @@ type StrategyInstance struct {
 	TimeFrame int `json:"timeFrame" gorm:"column:time_frame"`
 	Status string `json:"status" gorm:"column:status"`
 	IsFutures bool `json:"isFutures" gorm:"column:is_futures"`
+	Leverage *int `json:"leverage" gorm:"column:leverage"`
 }
 
 type StrategyMonitoring struct {
