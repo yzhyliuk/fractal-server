@@ -25,7 +25,7 @@ func RunGlideOnPrice(userID int, rawConfig []byte) error{
 		Pair:       config.Pair,
 		Bid:        config.BidSize,
 		UserID:     userID,
-		StrategyID: 1,
+		StrategyID: 2,
 		TimeFrame:  config.TimeFrame,
 		IsFutures: config.IsFutures,
 		Status:     helpers.Created,
