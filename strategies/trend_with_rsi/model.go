@@ -81,27 +81,33 @@ func (t *trendWithRSIStrategy) HandlerFunc(marketData *block.Block)  {
 
 func (t *trendWithRSIStrategy) Evaluate(marketData *block.Block, rsi float64, uptrend, rsiOverbought, rsiOversold bool)  {
 	if t.LastTrade != nil {
-		if t.orderUptrend && rsi > 50{
-			t.CloseAllTrades()
-		} else if !t.orderUptrend && rsi < 50 {
+		if t.orderUptrend != uptrend{
 			t.CloseAllTrades()
 		}
 	}
-	if uptrend && rsiOversold{
-		t.orderUptrend = uptrend
-		err := t.HandleBuy(marketData)
-		if err != nil {
-			logs.LogDebug("", err)
-			return
+	if uptrend{
+		if rsi < 50 {
+			t.orderUptrend = uptrend
+			err := t.HandleBuy(marketData)
+			if err != nil {
+				logs.LogDebug("", err)
+				return
+			}
+		} else if rsiOverbought{
+			t.orderUptrend = uptrend
+			t.CloseAllTrades()
 		}
-	} else if !uptrend && rsiOverbought{
-		t.orderUptrend = uptrend
-		err := t.HandleSell(marketData)
-		if err != nil {
-			logs.LogDebug("", err)
-			return
+	} else {
+		if rsi > 50 {
+			t.orderUptrend = uptrend
+			err := t.HandleSell(marketData)
+			if err != nil {
+				logs.LogDebug("", err)
+				return
+			}
+		} else if rsiOversold {
+			t.CloseAllTrades()
 		}
-
 	}
 }
 

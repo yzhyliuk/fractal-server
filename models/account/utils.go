@@ -45,7 +45,7 @@ func GetAllPairsForBinance(isFutures bool) (map[string]struct{}, error) {
 	}
 }
 
-func (b *BinanceAccount) getPrecisionMap() (map[string]int, error)  {
+func (b *BinanceAccount) getPrecisionMap() (map[string]AssetPrecision, error)  {
 
 	//Getting limits for min quantity of current trading pair
 	exchangeInfo, err := b.client.NewExchangeInfoService().Do(context.Background())
@@ -53,31 +53,17 @@ func (b *BinanceAccount) getPrecisionMap() (map[string]int, error)  {
 		return nil, err
 	}
 
-	allPairs, err := GetAllPairsForBinance(false)
-	if err != nil {
-		return nil, err
-	}
-
-	precisionMap := make(map[string]int)
+	precisionMap := make(map[string]AssetPrecision)
 
 	for _, elem := range exchangeInfo.Symbols {
-		_, exists := allPairs[elem.Symbol]
-		if exists {
-
-			precision := 0
-			spl := strings.Split(elem.LotSizeFilter().MinQuantity, ".")
-
-			for _, v := range spl[1] {
-				if v != '1' {
-					precision++
-				} else {
-					precision++
-					break
-				}
-			}
-			precisionMap[elem.Symbol] = precision
+		str := elem.Filters[2]["stepSize"].(string)
+		str = strings.Replace(str,".","",1)
+		prec := strings.Index(str,"1")
+		precisionMap[elem.Symbol] = AssetPrecision{
+			Quantity: prec,
 		}
 	}
+
 	return precisionMap, nil
 }
 
