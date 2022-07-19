@@ -13,6 +13,7 @@ import (
 )
 
 const BinanceFuturesTakerFeeRate = 0.0004
+const BinanceSpotTakerFee = 0.00075
 
 type Account interface {
 	GetBalance(symbol string) float64
@@ -20,6 +21,7 @@ type Account interface {
 	// PlaceLimitOrder(sum, price float64,symbol string, side binance.SideType) (*trade.Trade, error)
 	OpenFuturesPosition(amount float64, symbol string, side futures.SideType, inst *instance.StrategyInstance) (*trade.Trade, error)
 	CloseFuturesPosition(tradeFutures *trade.Trade) (*trade.Trade, error)
+	PlaceRawSpotOrder(sum float64, symbol string, side binance.SideType) (*binance.CreateOrderResponse, error)
 }
 
 type TakeProfit struct {
@@ -41,7 +43,7 @@ type BinanceAccount struct {
 	client *binance.Client
 	futuresClient *futures.Client
 
-	precision map[string]int
+	precision map[string]AssetPrecision
 	precisionFutures map[string]AssetPrecision
 }
 
@@ -73,6 +75,16 @@ func NewBinanceAccount(apiKey, secretKey, futuresApiKey, futuresSecretKey string
 
 func (b *BinanceAccount) GetBalance(symbol string) float64 {
 	return 0
+}
+
+func (b *BinanceAccount) PlaceRawSpotOrder(sum float64, symbol string, side binance.SideType) (*binance.CreateOrderResponse, error) {
+	quantity := b.formatQuantity(sum, symbol, false)
+	order, err := b.client.NewCreateOrderService().Symbol(symbol).Side(side).Type(binance.OrderTypeMarket).Quantity(quantity).Do(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	return order, nil
 }
 func (b *BinanceAccount) PlaceMarketOrder(sum float64, symbol string, side binance.SideType, inst *instance.StrategyInstance, prevTrade *trade.Trade) (*trade.Trade, error) {
 	quantity := b.formatQuantity(sum, symbol, false)
@@ -258,7 +270,7 @@ func (b *BinanceAccount) formatQuantity(sum float64, symbol string, isFutures bo
 	if isFutures {
 		return fmt.Sprintf("%.*f", b.precisionFutures[symbol].Quantity, sum)
 	} else {
-		return fmt.Sprintf("%.*f", b.precision[symbol], sum)
+		return fmt.Sprintf("%.*f", b.precision[symbol].Quantity, sum)
 	}
 }
 

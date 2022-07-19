@@ -1,4 +1,5 @@
-package template
+package trend_with_rsi
+
 
 import (
 	"encoding/json"
@@ -13,8 +14,8 @@ import (
 	"time"
 )
 
-func RunMovingAverageCrossover(userID int, rawConfig []byte) error{
-	var config StrategyTemplateConfig
+func RunTrendWithRSI(userID int, rawConfig []byte) error{
+	var config TrendWithRSIConfig
 
 	err := json.Unmarshal(rawConfig, &config)
 	if err != nil {
@@ -25,7 +26,7 @@ func RunMovingAverageCrossover(userID int, rawConfig []byte) error{
 		Pair:       config.Pair,
 		Bid:        config.BidSize,
 		UserID:     userID,
-		StrategyID: 0,
+		StrategyID: 3,
 		IsFutures: config.IsFutures,
 		TimeFrame:  config.TimeFrame,
 		Status:     helpers.Created,
@@ -58,7 +59,7 @@ func RunMovingAverageCrossover(userID int, rawConfig []byte) error{
 		storage.MonitorsBinance[monitorName] = monitor
 		storage.MonitorsBinance[monitorName].RunMonitor()
 		monitorChannel = storage.MonitorsBinance[monitorName].Subscribe(inst.ID)
-		observationsData = make([]*block.Block, config.LongTermPeriod)
+		//observationsData = make([]*block.Block, config.LongTermPeriod)
 	}
 
 	keys, err := users.GetUserKeys(db, userID)
@@ -77,3 +78,4 @@ func RunMovingAverageCrossover(userID int, rawConfig []byte) error{
 
 	return nil
 }
+

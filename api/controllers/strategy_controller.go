@@ -6,9 +6,12 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"net/http"
 	"newTradingBot/api/common"
+	"newTradingBot/internal_arbitrage"
+	"newTradingBot/models/account"
 	"newTradingBot/models/apimodels"
 	"newTradingBot/models/strategy/instance"
 	"newTradingBot/models/trade"
+	"newTradingBot/models/users"
 	"newTradingBot/storage"
 	"strconv"
 	"strings"
@@ -224,4 +227,34 @@ func (s *StrategyController) GetTradesForInstance(c *fiber.Ctx) error  {
 	}
 
 	return c.JSON(trades)
+}
+
+func (s *StrategyController) RunArbitrage(c *fiber.Ctx) error  {
+	var config struct{
+		Target string `json:"target"`
+		Primary string `json:"primary"`
+	}
+
+	err := c.BodyParser(&config)
+	if err != nil {
+		return err
+	}
+
+	userinfo, err := s.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	keys, err := users.GetUserKeys(s.GetDB(), userinfo.UserID)
+	if err != nil {
+		return err
+	}
+
+	acc , err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey,keys.ApiKey,keys.SecretKey)
+	go func() {
+		err = internal_arbitrage.RunArbitrageWithParams(config.Target, config.Primary, acc, 20)
+	}()
+
+
+	return nil
 }

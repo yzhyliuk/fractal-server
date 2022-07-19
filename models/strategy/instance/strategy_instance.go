@@ -23,7 +23,7 @@ type StrategyInstance struct {
 }
 
 type StrategyMonitoring struct {
-	StrategyInstance
+	*StrategyInstance
 	Name string `json:"name" gorm:"name"`
 	Profit float64 `json:"profit" gorm:"column:profit"`
 	WinRate float64 `json:"winRate" gorm:"column:win_rate" `
