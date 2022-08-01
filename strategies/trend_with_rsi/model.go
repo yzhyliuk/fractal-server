@@ -86,7 +86,7 @@ func (t *trendWithRSIStrategy) Evaluate(marketData *block.Block, rsi float64, up
 		}
 	}
 	if uptrend{
-		if rsi < 50 {
+		if rsiOversold {
 			t.orderUptrend = uptrend
 			err := t.HandleBuy(marketData)
 			if err != nil {
@@ -98,7 +98,7 @@ func (t *trendWithRSIStrategy) Evaluate(marketData *block.Block, rsi float64, up
 			t.CloseAllTrades()
 		}
 	} else {
-		if rsi > 50 {
+		if rsiOverbought {
 			t.orderUptrend = uptrend
 			err := t.HandleSell(marketData)
 			if err != nil {

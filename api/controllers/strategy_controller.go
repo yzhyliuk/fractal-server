@@ -151,6 +151,9 @@ func (s *StrategyController) StopStrategy(c *fiber.Ctx) error {
 	go storage.StrategiesStorage[instanceID].Stop()
 	delete(storage.StrategiesStorage, instanceID)
 
+	// TODO: if there is no running strategies for monitor - delete it
+
+
 	return c.SendStatus(http.StatusOK)
 }
 

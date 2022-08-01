@@ -91,3 +91,19 @@ func (u *UserController) GetKeys(c *fiber.Ctx) error  {
 
 	return c.JSON(keys)
 }
+
+func (u *UserController) GetUserBalance(c *fiber.Ctx) error {
+	userInfo, err := u.GetUserInfo(c)
+	if err != nil {
+		return err
+
+	}
+
+	finance, err := users.GetUserFinances(u.GetDB(), userInfo.UserID)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(finance)
+
+}

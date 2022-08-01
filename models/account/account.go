@@ -16,12 +16,12 @@ const BinanceFuturesTakerFeeRate = 0.0004
 const BinanceSpotTakerFee = 0.00075
 
 type Account interface {
-	GetBalance(symbol string) float64
+	GetStableBalance() (*UserBalances, error)
 	PlaceMarketOrder(sum float64, symbol string, side binance.SideType, inst *instance.StrategyInstance, prevTrade *trade.Trade) (*trade.Trade, error)
-	// PlaceLimitOrder(sum, price float64,symbol string, side binance.SideType) (*trade.Trade, error)
 	OpenFuturesPosition(amount float64, symbol string, side futures.SideType, inst *instance.StrategyInstance) (*trade.Trade, error)
 	CloseFuturesPosition(tradeFutures *trade.Trade) (*trade.Trade, error)
 	PlaceRawSpotOrder(sum float64, symbol string, side binance.SideType) (*binance.CreateOrderResponse, error)
+	GetOrder(orderID int64) (*futures.Order, error)
 }
 
 type TakeProfit struct {
@@ -73,8 +73,8 @@ func NewBinanceAccount(apiKey, secretKey, futuresApiKey, futuresSecretKey string
 	return nba, nil
 }
 
-func (b *BinanceAccount) GetBalance(symbol string) float64 {
-	return 0
+func (b *BinanceAccount) GetOrder(orderID int64) (*futures.Order, error) {
+	return b.futuresClient.NewGetOrderService().OrderID(orderID).Do(context.Background())
 }
 
 func (b *BinanceAccount) PlaceRawSpotOrder(sum float64, symbol string, side binance.SideType) (*binance.CreateOrderResponse, error) {
@@ -86,6 +86,7 @@ func (b *BinanceAccount) PlaceRawSpotOrder(sum float64, symbol string, side bina
 
 	return order, nil
 }
+
 func (b *BinanceAccount) PlaceMarketOrder(sum float64, symbol string, side binance.SideType, inst *instance.StrategyInstance, prevTrade *trade.Trade) (*trade.Trade, error) {
 	quantity := b.formatQuantity(sum, symbol, false)
 	order, err := b.client.NewCreateOrderService().Symbol(symbol).Side(side).Type(binance.OrderTypeMarket).Quantity(quantity).Do(context.Background())
@@ -170,9 +171,13 @@ func (b *BinanceAccount) OpenFuturesPosition(amount float64, symbol string, side
 
 	orderID := res.OrderID
 
-	order, err := b.futuresClient.NewGetOrderService().Symbol(symbol).OrderID(orderID).Do(context.Background())
-	if err != nil {
-		return nil, err
+	var order *futures.Order
+
+	for order == nil {
+		order, _ = b.futuresClient.NewGetOrderService().Symbol(symbol).OrderID(orderID).Do(context.Background())
+		if err != nil {
+			time.Sleep(10*time.Second)
+		}
 	}
 
 	futuresTrade := &trade.Trade{}
@@ -229,10 +234,17 @@ func (b *BinanceAccount) CloseFuturesPosition(futuresTrade *trade.Trade) (*trade
 		return nil, err
 	}
 
-	order, err := b.futuresClient.NewGetOrderService().Symbol(futuresTrade.Pair).OrderID(res.OrderID).Do(context.Background())
-	if err != nil {
-		return nil, err
+	var order *futures.Order
+
+	for order == nil {
+		order, err = b.futuresClient.NewGetOrderService().Symbol(futuresTrade.Pair).OrderID(res.OrderID).Do(context.Background())
+		if err != nil {
+			time.Sleep(5*time.Second)
+		} else {
+			break
+		}
 	}
+
 
 	price, err := strconv.ParseFloat(order.AvgPrice, 64)
 	if err != nil {
