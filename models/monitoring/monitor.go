@@ -8,6 +8,7 @@ import (
 	"newTradingBot/logs"
 	block2 "newTradingBot/models/block"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,7 @@ type BinanceMonitor struct {
 	stopSignal chan bool
 	subscribers map[int]chan *block2.Block
 	isFutures bool
+	mtx sync.Mutex
 }
 
 func NewBinanceMonitor(symbol string, timeFrameDuration time.Duration, isFutures bool) *BinanceMonitor  {
@@ -48,13 +50,19 @@ func (m *BinanceMonitor) UnSubscribe(id int) {
 	logs.LogDebug(fmt.Sprintf("Instance #%d is UNSUBSCRIBED to BINANCE Monitor", id), nil)
 }
 
+// IsEmptySubs - returns current number of subscribers for monitor
+func (m *BinanceMonitor) IsEmptySubs() int {
+	return len(m.subscribers)
+}
 
 // NotifyAll - send data to all existent subscribers
-func (m *BinanceMonitor) NotifyAll(marketData *block2.Block)  {
+func (m *BinanceMonitor) NotifyAll(marketData block2.Block)  {
 	logs.LogDebug("Start notify all instances for binance monitor", nil)
+	m.mtx.Lock()
 	for _, channel := range m.subscribers {
-		channel <- marketData
+		channel <- &marketData
 	}
+	m.mtx.Unlock()
 }
 
 func (m *BinanceMonitor) IsFutures() bool  {
@@ -88,7 +96,9 @@ func (m *BinanceMonitor) RunMonitor()  {
 
 				if !m.isFutures {
 					wsAggTradeHandler := func(event *binance.WsAggTradeEvent) {
+
 						price, _ := strconv.ParseFloat(event.Price, 64)
+						m.mtx.Lock()
 						block.Trades = append(block.Trades, price)
 						block.TradesCount++
 
@@ -101,11 +111,14 @@ func (m *BinanceMonitor) RunMonitor()  {
 						if price < block.MinPrice {
 							block.MinPrice = price
 						}
+
+						m.mtx.Unlock()
 					}
 
 					_, stopC, _ = binance.WsAggTradeServe(m.symbol, wsAggTradeHandler, errHandlerLog)
 				} else {
 					wsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
+						m.mtx.Lock()
 						price, _ := strconv.ParseFloat(event.Price, 64)
 						block.Trades = append(block.Trades, price)
 						block.TradesCount++
@@ -119,6 +132,7 @@ func (m *BinanceMonitor) RunMonitor()  {
 						if price < block.MinPrice {
 							block.MinPrice = price
 						}
+						m.mtx.Unlock()
 					}
 
 					_, stopC, _ = futures.WsAggTradeServe(m.symbol, wsAggTradeHandler, errHandlerLog)
@@ -127,6 +141,7 @@ func (m *BinanceMonitor) RunMonitor()  {
 				time.Sleep(m.timeFrameDuration)
 				stopC <- struct{}{}
 
+				m.mtx.Lock()
 				if block.TradesCount > 0 {
 					block.EntryPrice = block.Trades[0]
 					block.ClosePrice = block.Trades[block.TradesCount-1]
@@ -136,11 +151,13 @@ func (m *BinanceMonitor) RunMonitor()  {
 						sum += block.Trades[i]
 					}
 					block.AveragePrice = sum/float64(block.TradesCount)
+					m.mtx.Unlock()
 
-					go m.NotifyAll(block)
-
-					logs.LogDebug("BINANCE monitor loop finished", nil)
+					go m.NotifyAll(*block)
+				} else {
+					m.mtx.Unlock()
 				}
+				logs.LogDebug("BINANCE monitor loop finished", nil)
 			}
 		}
 	}()

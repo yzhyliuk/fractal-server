@@ -21,6 +21,7 @@ func userRoutes(app *fiber.App)  {
 	usersGroup.Get("/my-info", userController.GetUser)
 	usersGroup.Post("/set-keys", userController.SetKeys)
 	usersGroup.Get("/get-keys", userController.GetKeys)
+	usersGroup.Get("/get-finances", userController.GetUserBalance)
 }
 
 func strategyRoutes(app *fiber.App)  {
