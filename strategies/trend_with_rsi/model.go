@@ -33,8 +33,8 @@ type FrameData struct {
 	Time time.Time `json:"time"`
 }
 
-// NewTemplateStrategy - creates new Moving Average crossover strategy
-func NewTemplateStrategy(monitorChannel chan *block.Block, config TrendWithRSIConfig, keys *users.Keys, historicalData []*block.Block, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+// NewTrendFollowWithRSIStrategy - creates new Moving Average crossover strategy
+func NewTrendFollowWithRSIStrategy(monitorChannel chan *block.Block, config TrendWithRSIConfig, keys *users.Keys, historicalData []*block.Block, inst *instance.StrategyInstance) (strategy.Strategy, error) {
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {

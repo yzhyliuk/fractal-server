@@ -13,7 +13,7 @@ type Config struct {
 }
 
 func New(config ...Config) func(*fiber.Ctx) error {
-	// Init config
+	// Init configuration
 	var cfg Config
 	if len(config) > 0 {
 		cfg = config[0]

@@ -2,17 +2,16 @@ package controllers
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"net/http"
 	"newTradingBot/api/common"
 	"newTradingBot/internal_arbitrage"
 	"newTradingBot/models/account"
 	"newTradingBot/models/apimodels"
+	"newTradingBot/models/strategy/actions"
 	"newTradingBot/models/strategy/instance"
 	"newTradingBot/models/trade"
 	"newTradingBot/models/users"
-	"newTradingBot/storage"
 	"strconv"
 	"strings"
 )
@@ -86,7 +85,7 @@ func (s *StrategyController) GetPairs(c *fiber.Ctx) error {
 }
 
 
-// RunStrategy - runs strategy with config from client side
+// RunStrategy - runs strategy with configuration from client side
 func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
 	strategyID, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
@@ -139,20 +138,12 @@ func (s *StrategyController) StopStrategy(c *fiber.Ctx) error {
 		return err
 	}
 
-	err = instance.UpdateStatus(s.GetDB(), instanceID, instance.StatusStopped)
+	err = actions.StopStrategy(s.GetDB(), strategyInstance.StrategyInstance)
 	if err != nil {
 		return err
 	}
 
-	monitorName := fmt.Sprintf("%s:%d:%t",strategyInstance.Pair, strategyInstance.TimeFrame, strategyInstance.IsFutures)
-
-	storage.MonitorsBinance[monitorName].UnSubscribe(strategyInstance.ID)
-
-	go storage.StrategiesStorage[instanceID].Stop()
-	delete(storage.StrategiesStorage, instanceID)
-
 	// TODO: if there is no running strategies for monitor - delete it
-
 
 	return c.SendStatus(http.StatusOK)
 }
@@ -257,7 +248,6 @@ func (s *StrategyController) RunArbitrage(c *fiber.Ctx) error  {
 	go func() {
 		err = internal_arbitrage.RunArbitrageWithParams(config.Target, config.Primary, acc, 20)
 	}()
-
 
 	return nil
 }

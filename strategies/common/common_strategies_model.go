@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
+	"newTradingBot/api/database"
 	"newTradingBot/logs"
 	"newTradingBot/models/account"
 	"newTradingBot/models/block"
+	"newTradingBot/models/strategy/actions"
 	"newTradingBot/models/strategy/instance"
 	"newTradingBot/models/trade"
 )
@@ -18,12 +20,15 @@ type Strategy struct {
 	StopSignal chan bool
 	LastTrade *trade.Trade
 
+	TotalProfit float64
+
 	Stopped bool
 	HandlerFunction func(marketData *block.Block)
 	DataProcessFunction func(marketData *block.Block)
 }
 
 func (m *Strategy) Execute()  {
+	m.TotalProfit = 0
 	go func() {
 		for  {
 			select {
@@ -34,6 +39,11 @@ func (m *Strategy) Execute()  {
 				if m.Stopped {
 					return
 				}
+
+				if m.StopLossCondition() {
+					continue
+				}
+
 				m.DataProcessFunction(marketData)
 				m.HandlerFunction(marketData)
 
@@ -47,6 +57,25 @@ func (m *Strategy) Execute()  {
 
 func (m *Strategy) GetInstance() *instance.StrategyInstance {
 	return m.StrategyInstance
+}
+
+func (m *Strategy) StopLossCondition() bool {
+	if m.StrategyInstance.StopLoss == 0 {
+		return false
+	}
+	if m.TotalProfit*-1 > m.StrategyInstance.StopLoss {
+		db, _ := database.GetDataBaseConnection()
+		go func() {
+			err := actions.StopStrategy(db, m.StrategyInstance)
+			if err != nil {
+				logs.LogDebug("", err)
+			}
+		}()
+
+		return true
+	}
+
+	return false
 }
 
 func (m *Strategy) HandleSell(marketData *block.Block) error {
@@ -135,11 +164,12 @@ func (m *Strategy) sell(marketData *block.Block) error {
 }
 
 func (m *Strategy) closePreviousTrade()  {
-	_, err := m.Account.CloseFuturesPosition(m.LastTrade)
+	tradeClosed, err := m.Account.CloseFuturesPosition(m.LastTrade)
 	if err != nil {
 		logs.LogDebug("", err)
 		return
 	}
+	m.TotalProfit += tradeClosed.Profit
 	m.LastTrade = nil
 }
 
