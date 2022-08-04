@@ -1,6 +1,10 @@
 package instance
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+	"newTradingBot/api/helpers"
+	"newTradingBot/models/strategy/configs"
+)
 
 const strategyInstancesTableName = "strategy_instances"
 const strategyMonitoringTableName = "strategy_instance_monitoring"
@@ -20,6 +24,7 @@ type StrategyInstance struct {
 	Status string `json:"status" gorm:"column:status"`
 	IsFutures bool `json:"isFutures" gorm:"column:is_futures"`
 	Leverage *int `json:"leverage" gorm:"column:leverage"`
+	StopLoss float64 `json:"stopLoss" gorm:"-"`
 }
 
 type StrategyMonitoring struct {
@@ -36,6 +41,25 @@ func (s StrategyInstance) TableName() string  {
 func (s StrategyMonitoring) TableName() string  {
 	return strategyMonitoringTableName
 
+}
+
+func GetInstanceFromConfig(conf configs.BaseStrategyConfig, userID, strategyID int) *StrategyInstance {
+	inst := &StrategyInstance{
+		Pair:       conf.Pair,
+		Bid:        conf.BidSize,
+		UserID:     userID,
+		StrategyID: strategyID,
+		IsFutures: conf.IsFutures,
+		TimeFrame:  conf.TimeFrame,
+		Status:     helpers.Created,
+		StopLoss: conf.StopLoss,
+	}
+
+	if inst.IsFutures {
+		inst.Leverage = conf.Leverage
+	}
+
+	return inst
 }
 
 // CreateStrategyInstance - creates new instance of strategy

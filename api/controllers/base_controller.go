@@ -67,3 +67,7 @@ func (b *BaseController) GetFilteredDB(c *fiber.Ctx) *gorm.DB {
 
 	return db
 }
+
+func (b *BaseController) Ping(c *fiber.Ctx) error {
+	return c.SendString("Pong")
+}

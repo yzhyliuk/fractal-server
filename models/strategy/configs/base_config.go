@@ -7,5 +7,6 @@ type BaseStrategyConfig struct {
 	TimeFrame int `json:"timeFrame"`
 	IsFutures bool `json:"isFutures"`
 	Leverage *int `json:"leverage"`
+	StopLoss float64 `json:"stopLoss"`
 }
 

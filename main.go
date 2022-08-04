@@ -1,25 +1,27 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"newTradingBot/api"
 	"newTradingBot/api/common"
+	"newTradingBot/configuration"
 	"newTradingBot/logs"
 	"newTradingBot/storage"
 	"os"
 	"os/signal"
 )
 
-const testnetApi = "wNjHUt25VGuUbtg5xSPWEWhcXnKvDRb7MKfFpGF4VBIyFzoN8LrxcDKcZuzt42Rp"
-const testnetSecret = "bokQfryzyvDUmvdocBd0T6jpMiWLzK5o3mB4sfGSRQX6a9GQbXl1P8uB5WaDFEHA"
-
-const futuresTestnetApi = "1727c6deddc958a983d169d20cad955a9896cb5a8bc6e405b99517ecae43a4ee"
-const futuresTestnetSecret = "d0cb5106d2f17f7cb37cf4ec6568c9687ba76140fce0343e6d20a65395cedc99"
-
-const realApi = "SNbfHhaCv47GdosKEuuD9nZVdG2uTJIgVdVkfeY4eIAyLiBawEfxfdPclOwXhbIw"
-const realSecretKey = "BL7kS7hN7ry7DWzsoSSsJkQziI5yGBdsSZRyYCHzTO6jkKtDkSm5Z1mcbBOPBy47"
-
 func main()  {
+
+	mode := flag.String("mode", "dev", "launch mode: dev (development) | prod (production)")
+	flag.Parse()
+
+	if mode != nil && *mode == configuration.Prod {
+		configuration.Mode = configuration.Prod
+	} else  {
+		configuration.Mode = configuration.Dev
+	}
 
 	c := make(chan os.Signal,1)
 	signal.Notify(c, os.Interrupt)
@@ -37,12 +39,6 @@ func main()  {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	//acc, _ := account.NewBinanceAccount(realApi, realSecretKey ,realApi, realSecretKey)
-	//order, err := acc.OpenFuturesPosition(0.1, "BNBUSDT",futures.SideTypeSell, nil)
-	//result, err := acc.CloseFuturesPosition(order)
-	//fmt.Println(err,result)
-
 }
 
 func terminateAllStrategies()  {

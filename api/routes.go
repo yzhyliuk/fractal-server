@@ -8,6 +8,9 @@ import (
 func publicRoutes(app *fiber.App)  {
 	userController := &controllers.UserController{}
 	authController := &controllers.AuthController{}
+	base := &controllers.BaseController{}
+
+	app.Get("/ping", base.Ping)
 
 	app.Post("/auth", authController.Login)
 	usersGroup := app.Group("/users")
