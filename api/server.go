@@ -11,7 +11,7 @@ func StartServer() (*fiber.App, error) {
 	app := fiber.New()
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "*",
-		AllowHeaders:     "Origin, X-Requested-With, Content-Type, Accept, x-access-token, X-Auth-Token",
+		AllowHeaders:     "Origin, X-Requested-With, Content-Type, Accept, Referer, x-access-token, X-Auth-Token",
 		AllowMethods:     "GET, PUT, POST, DELETE, OPTIONS",
 		AllowCredentials: true,
 	}))
