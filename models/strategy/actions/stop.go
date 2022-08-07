@@ -21,6 +21,10 @@ func StopStrategy(db *gorm.DB, inst *instance.StrategyInstance) error {
 	go storage.StrategiesStorage[inst.ID].Stop()
 	delete(storage.StrategiesStorage, inst.ID)
 
+	if storage.MonitorsBinance[monitorName].IsEmptySubs() {
+		delete(storage.MonitorsBinance, monitorName)
+	}
+
 	return nil
 }
 

@@ -1,9 +1,7 @@
 package mac
 
 import (
-	"encoding/json"
 	"fmt"
-	"log"
 	"newTradingBot/api/database"
 	"newTradingBot/indicators"
 	"newTradingBot/logs"
@@ -52,29 +50,18 @@ func NewMacStrategy(monitorChannel chan *block.Block, config MovingAverageCrosso
 
 	observations := make([]*dataToStore, config.LongTermPeriod)
 
-	if historicalData[0] != nil {
-		for _, dataFrame := range historicalData {
-			sumPerFrame := 0.
-			for i := range dataFrame.Trades {
-				sumPerFrame += dataFrame.Trades[i]
-			}
-			observations = observations[1:]
-			observations = append(observations, &dataToStore{Sum: sumPerFrame, Count: dataFrame.TradesCount})
-		}
-	}
-
-	strategy := &movingAverageCrossover{
+	strat := &movingAverageCrossover{
 		config: config,
 		observations: observations,
 	}
-	strategy.Account = acc
-	strategy.StopSignal = make(chan bool)
-	strategy.MonitorChannel = monitorChannel
-	strategy.StrategyInstance = inst
-	strategy.HandlerFunction = strategy.HandlerFunc
-	strategy.DataProcessFunction = strategy.processData
+	strat.Account = acc
+	strat.StopSignal = make(chan bool)
+	strat.MonitorChannel = monitorChannel
+	strat.StrategyInstance = inst
+	strat.HandlerFunction = strat.HandlerFunc
+	strat.DataProcessFunction = strat.processData
 
-	return strategy, nil
+	return strat, nil
 }
 
 func (m *movingAverageCrossover) HandlerFunc(marketData *block.Block)  {
@@ -131,21 +118,7 @@ func (m *movingAverageCrossover) evaluate(marketData *block.Block, longTerm, sho
 	}
 
 	logs.LogDebug(fmt.Sprintf("Data processing is finished by instance #%d", m.StrategyInstance.ID), nil)
-
-	df := &FrameData{Time: time.Now(), LongTerm: longTerm, ShortTerm: shortTerm}
-	data, err := json.Marshal(df)
-	if err != nil {
-		log.Println(err.Error())
-	}
-
-	db, err := database.GetDataBaseConnection()
-	if err != nil {
-		log.Println(err.Error())
-	}
-	err = instance.NewDataFrame(db, &instance.DataFrame{InstanceID: m.StrategyInstance.ID, Data: data})
-	if err != nil {
-		log.Println(err.Error())
-	}
+	logs.LogDebug(fmt.Sprintf("LONG: %f \t SHORT: %f",longTerm, shortTerm), nil)
 }
 
 func (m *movingAverageCrossover) processData(marketData *block.Block)  {

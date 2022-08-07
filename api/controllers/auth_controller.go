@@ -39,6 +39,8 @@ func (a *AuthController) Login(c *fiber.Ctx) error {
 			Name:     auth.AToken,
 			Value:    *token,
 			HTTPOnly: true,
+			Secure: true,
+			SameSite: "None",
 		})
 		return nil
 	}

@@ -51,8 +51,8 @@ func (m *BinanceMonitor) UnSubscribe(id int) {
 }
 
 // IsEmptySubs - returns current number of subscribers for monitor
-func (m *BinanceMonitor) IsEmptySubs() int {
-	return len(m.subscribers)
+func (m *BinanceMonitor) IsEmptySubs() bool {
+	return len(m.subscribers) == 0
 }
 
 // NotifyAll - send data to all existent subscribers
