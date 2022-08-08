@@ -174,6 +174,15 @@ func (m *Strategy) closePreviousTrade()  {
 }
 
 func (m *Strategy) Stop()  {
+	db, err := database.GetDataBaseConnection()
+	if err != nil {
+		logs.LogDebug("", err)
+	}
+	err = instance.UpdateStatus(db, m.StrategyInstance.ID, instance.StatusStopped)
+	if err != nil {
+		logs.LogDebug("", err)
+	}
+
 	m.Stopped = true
 	go func() { m.StopSignal <- true }()
 
