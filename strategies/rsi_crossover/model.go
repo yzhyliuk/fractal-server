@@ -66,7 +66,7 @@ func (m *rsiCrossover) HandlerFunc(marketData *block.Block)  {
 			logs.LogDebug("", err)
 			return
 		}
-	} else if shortTerm > longTerm {
+	} else if shortTerm < longTerm {
 		err := m.HandleSell(marketData)
 		if err != nil {
 			logs.LogDebug("", err)
