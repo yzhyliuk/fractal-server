@@ -25,6 +25,7 @@ type Strategy struct {
 	Stopped bool
 	HandlerFunction func(marketData *block.Block)
 	DataProcessFunction func(marketData *block.Block)
+	ExperimentalHandler func()
 }
 
 func (m *Strategy) Execute()  {
@@ -54,6 +55,9 @@ func (m *Strategy) Execute()  {
 	}()
 }
 
+func (m *Strategy) ExecuteExperimental()  {
+	m.ExperimentalHandler()
+}
 
 func (m *Strategy) GetInstance() *instance.StrategyInstance {
 	return m.StrategyInstance

@@ -8,6 +8,8 @@ type StrategyInfo struct {
 	ID int `json:"id" gorm:"column:id"`
 	Name string `json:"name" gorm:"column:"`
 	Description string `json:"description" gorm:"column:description"`
+	IsContinuous bool `json:"isContinuous" gorm:"column:is_continuous"`
+	Disabled bool `json:"disabled" gorm:"column:disabled"`
 }
 
 func (s *StrategyInfo) TableName() string  {
