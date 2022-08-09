@@ -57,24 +57,35 @@ func (m *rsiCrossover) HandlerFunc(marketData *block.Block)  {
 		_ = instance.UpdateStatus(db, m.StrategyInstance.ID, instance.StatusRunning)
 	}
 
-	longTerm := indicators.SimpleMA(m.rsiObservations,m.config.LongTermPeriod)
-	shortTerm := indicators.SimpleMA(m.rsiObservations, m.config.ShortTermPeriod)
 
-	if shortTerm > longTerm {
+
+	longTerm := indicators.SimpleMA(m.rsiObservations,m.config.LongTermPeriod)
+	currentRSI := m.rsiObservations[len(m.rsiObservations)-1]
+
+	min := indicators.Min(m.closePriceObservations)
+	max := indicators.Max(m.closePriceObservations)
+	currentVolatility := ((max/min)-1)*100
+
+	logs.LogDebug(fmt.Sprintf("RSI: (CURRENT): %f \t (LONG): %f \n (VOL): %f%", currentRSI, longTerm, currentVolatility),nil)
+
+	if m.config.Volatility != 0 && m.config.Volatility > currentVolatility {
+		m.CloseAllTrades()
+		return
+	}
+
+	if currentRSI > longTerm {
 		err := m.HandleBuy(marketData)
 		if err != nil {
 			logs.LogDebug("", err)
 			return
 		}
-	} else if shortTerm < longTerm {
+	} else if currentRSI < longTerm {
 		err := m.HandleSell(marketData)
 		if err != nil {
 			logs.LogDebug("", err)
 			return
 		}
 	}
-
-	logs.LogDebug(fmt.Sprintf("RSI: (SHORT): %f \t (LONG): %f", shortTerm, longTerm),nil)
 }
 
 func (m *rsiCrossover) ProcessData(marketData *block.Block)  {
