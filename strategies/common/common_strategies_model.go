@@ -44,6 +44,7 @@ func (m *Strategy) Execute()  {
 				if m.StopLossCondition() {
 					continue
 				}
+				m.HandleTPansSL(marketData)
 
 				m.DataProcessFunction(marketData)
 				m.HandlerFunction(marketData)
@@ -53,6 +54,41 @@ func (m *Strategy) Execute()  {
 			}
 		}
 	}()
+}
+
+func (m *Strategy) HandleTPansSL(marketData *block.Block)  {
+	if  m.LastTrade == nil {
+		return
+	}
+	currentClose := marketData.ClosePrice
+	open := m.LastTrade.PriceOpen
+	unrealizedProfit := currentClose/open
+	bid := m.StrategyInstance.Bid
+	bidPure := m.StrategyInstance.Bid / float64(*m.StrategyInstance.Leverage)
+
+	profit := 0.
+	roi := 0.
+
+	if m.LastTrade.FuturesSide == futures.SideTypeBuy {
+		profit = (bid*unrealizedProfit)-bid
+		roi = profit/bidPure
+	} else {
+		unrealizedProfit = 2 - unrealizedProfit
+		profit = (bid*unrealizedProfit)-bid
+		roi = profit/bidPure
+	}
+
+	if m.StrategyInstance.TradeStopLoss != 0 {
+		if roi < m.StrategyInstance.TradeStopLoss*-1 {
+			m.CloseAllTrades()
+		}
+	}
+
+	if m.StrategyInstance.TradeTakeProfit != 0 {
+		if roi > m.StrategyInstance.TradeTakeProfit {
+			m.CloseAllTrades()
+		}
+	}
 }
 
 func (m *Strategy) ExecuteExperimental()  {

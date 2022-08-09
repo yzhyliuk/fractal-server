@@ -8,5 +8,7 @@ type BaseStrategyConfig struct {
 	IsFutures bool `json:"isFutures"`
 	Leverage *int `json:"leverage"`
 	StopLoss float64 `json:"stopLoss"`
+	TradeTakeProfit float64 `json:"tradeTakeProfit"`
+	TradeStopLoss float64 `json:"tradeStopLoss"`
 }
 

@@ -25,6 +25,8 @@ type StrategyInstance struct {
 	IsFutures bool `json:"isFutures" gorm:"column:is_futures"`
 	Leverage *int `json:"leverage" gorm:"column:leverage"`
 	StopLoss float64 `json:"stopLoss" gorm:"-"`
+	TradeStopLoss float64 `json:"tradeStopLoss" gorm:"-"`
+	TradeTakeProfit float64 `json:"tradeTakeProfit" gorm:"-"`
 }
 
 type StrategyMonitoring struct {
@@ -53,6 +55,8 @@ func GetInstanceFromConfig(conf configs.BaseStrategyConfig, userID, strategyID i
 		TimeFrame:  conf.TimeFrame,
 		Status:     helpers.Created,
 		StopLoss: conf.StopLoss,
+		TradeStopLoss: conf.TradeStopLoss,
+		TradeTakeProfit: conf.TradeTakeProfit,
 	}
 
 	if inst.IsFutures {

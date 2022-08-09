@@ -19,6 +19,8 @@ type rsiCrossover struct {
 	closePriceObservations []float64
 	rsiObservations []float64
 
+	trend []int
+
 	config RSICrossoverConfig
 }
 
@@ -43,6 +45,7 @@ func NewRSICrossoverStrategy(monitorChannel chan *block.Block, config RSICrossov
 
 	newStrategy.closePriceObservations = make([]float64, config.RSIPeriod)
 	newStrategy.rsiObservations = make([]float64, config.LongTermPeriod)
+	newStrategy.trend = make([]int, 2)
 
 	return newStrategy, nil
 }
@@ -74,16 +77,27 @@ func (m *rsiCrossover) HandlerFunc(marketData *block.Block)  {
 	}
 
 	if currentRSI > longTerm {
-		err := m.HandleBuy(marketData)
-		if err != nil {
-			logs.LogDebug("", err)
-			return
-		}
+		m.trend = m.trend[1:]
+		m.trend = append(m.trend, 1)
 	} else if currentRSI < longTerm {
-		err := m.HandleSell(marketData)
-		if err != nil {
-			logs.LogDebug("", err)
-			return
+		m.trend = m.trend[1:]
+		m.trend = append(m.trend, 0)
+	}
+
+	trendChange := m.trend[1] != m.trend[0]
+	if trendChange {
+		if m.trend[1] == 1 {
+			err := m.HandleBuy(marketData)
+			if err != nil {
+				logs.LogDebug("", err)
+				return
+			}
+		} else {
+			err := m.HandleSell(marketData)
+			if err != nil {
+				logs.LogDebug("", err)
+				return
+			}
 		}
 	}
 }
