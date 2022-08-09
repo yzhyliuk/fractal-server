@@ -11,6 +11,7 @@ type Strategy interface {
 	Execute()
 	GetInstance() *instance.StrategyInstance
 	Stop()
+	ExecuteExperimental()
 }
 
 type HandlerFunc func(block *block.Block, orderSpot *binance.CreateOrderResponse, orderFutures *futures.CreateOrderResponse, err error)

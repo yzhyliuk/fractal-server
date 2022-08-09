@@ -10,9 +10,7 @@ import (
 func StartServer() (*fiber.App, error) {
 	app := fiber.New()
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*",
-		AllowHeaders:     "",
-		AllowMethods:     "GET, PUT, POST, DELETE, OPTIONS",
+		AllowMethods:     "GET, PATCH, PUT, POST, DELETE, OPTIONS",
 		AllowCredentials: true,
 	}))
 

@@ -45,3 +45,24 @@ func PrepareStrategy(conf configs.BaseStrategyConfig, userID int, strategyID int
 
 	return inst, monitorChannel, &keys, nil
 }
+
+func PrepareExperimentalStrategy(conf configs.BaseStrategyConfig, userID int, strategyID int) (*instance.StrategyInstance, *users.Keys, error) {
+	inst := instance.GetInstanceFromConfig(conf, userID, strategyID)
+
+	db, err := database.GetDataBaseConnection()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	inst, err = instance.CreateStrategyInstance(db, inst)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	keys, err := users.GetUserKeys(db, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return inst, &keys, nil
+}
