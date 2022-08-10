@@ -7,6 +7,10 @@ import (
 	"strings"
 )
 
+const filterType = "filterType"
+const lotSizeFilter = "LOT_SIZE"
+const stepSize = "stepSize"
+
 // GetAllPairsForBinance returns map with symbols for all available currencies pairs
 func GetAllPairsForBinance(isFutures bool) (map[string]struct{}, error) {
 
@@ -56,7 +60,16 @@ func (b *BinanceAccount) getPrecisionMap() (map[string]AssetPrecision, error)  {
 	precisionMap := make(map[string]AssetPrecision)
 
 	for _, elem := range exchangeInfo.Symbols {
-		str := elem.Filters[2]["stepSize"].(string)
+		filters := elem.Filters
+		var stepSizeFilter interface{}
+
+		for _, val := range filters {
+			if val["filterType"] == lotSizeFilter {
+				stepSizeFilter = val["stepSize"]
+			}
+		}
+
+		str := stepSizeFilter.(string)
 		str = strings.Replace(str,".","",1)
 		prec := strings.Index(str,"1")
 		precisionMap[elem.Symbol] = AssetPrecision{

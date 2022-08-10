@@ -21,10 +21,10 @@ func publicRoutes(app *fiber.App)  {
 func userRoutes(app *fiber.App)  {
 	userController := &controllers.UserController{}
 	usersGroup := app.Group("/users")
+	usersGroup.Get("/get-finances", userController.GetUserBalance)
 	usersGroup.Get("/my-info", userController.GetUser)
 	usersGroup.Post("/set-keys", userController.SetKeys)
 	usersGroup.Get("/get-keys", userController.GetKeys)
-	usersGroup.Get("/get-finances", userController.GetUserBalance)
 }
 
 func strategyRoutes(app *fiber.App)  {
