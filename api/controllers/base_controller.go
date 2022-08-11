@@ -57,6 +57,10 @@ func (b *BaseController) GetFilteredDB(c *fiber.Ctx) *gorm.DB {
 	db := b.GetDB()
 
 	for key, value := range query {
+		if value == "true" || value == "false" {
+			db = db.Where(fmt.Sprintf("%s = %s",key, value))
+			continue
+		}
 		_, err := strconv.Atoi(value)
 		if err == nil {
 			db = db.Where(fmt.Sprintf(`%s = %s`, key, value))

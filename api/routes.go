@@ -37,7 +37,9 @@ func strategyRoutes(app *fiber.App)  {
 	strategiesGroup.Get("/instances", strategyController.GetInstances)
 	strategiesGroup.Get("/instances/:id", strategyController.GetInstance)
 	strategiesGroup.Delete("/instances/:id", strategyController.Delete)
+	strategiesGroup.Post("/instances/delete-selected", strategyController.DeleteSelected)
 	strategiesGroup.Get("/instances/:id/trades",strategyController.GetTradesForInstance)
 	strategiesGroup.Get("/instances/:id/stop", strategyController.StopStrategy)
 	strategiesGroup.Post("/run-arbitrage", strategyController.RunArbitrage)
+	strategiesGroup.Post("/move-to-archive", strategyController.ArchiveStrategies)
 }
