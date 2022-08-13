@@ -18,7 +18,7 @@ type BinanceMonitor struct {
 	client *binance.Client
 	pause bool
 	stopSignal chan bool
-	subscribers map[int]chan *block2.Block
+	subscribers map[int]chan *block2.Data
 	isFutures bool
 	mtx sync.Mutex
 }
@@ -31,15 +31,15 @@ func NewBinanceMonitor(symbol string, timeFrameDuration time.Duration, isFutures
 	binMonitor.client = binance.NewClient("", "")
 
 	binMonitor.stopSignal = make(chan bool)
-	binMonitor.subscribers = make(map[int]chan *block2.Block)
+	binMonitor.subscribers = make(map[int]chan *block2.Data)
 	binMonitor.isFutures = isFutures
 
 	return &binMonitor
 }
 
 // Subscribe - add subscriber to the monitor
-func (m *BinanceMonitor) Subscribe(id int) chan *block2.Block {
-	m.subscribers[id] = make(chan *block2.Block)
+func (m *BinanceMonitor) Subscribe(id int) chan *block2.Data {
+	m.subscribers[id] = make(chan *block2.Data)
 	logs.LogDebug(fmt.Sprintf("Instance #%d is SUBSCRIBED to BINANCE Monitor", id), nil)
 	return m.subscribers[id]
 }
@@ -56,7 +56,7 @@ func (m *BinanceMonitor) IsEmptySubs() bool {
 }
 
 // NotifyAll - send data to all existent subscribers
-func (m *BinanceMonitor) NotifyAll(marketData block2.Block)  {
+func (m *BinanceMonitor) NotifyAll(marketData block2.Data)  {
 	logs.LogDebug("Start notify all instances for binance monitor", nil)
 	m.mtx.Lock()
 	for _, channel := range m.subscribers {
@@ -84,10 +84,10 @@ func (m *BinanceMonitor) RunMonitor()  {
 			case <-m.stopSignal:
 				return
 			default:
-				block := new(block2.Block)
+				block := new(block2.Data)
 				block.Symbol = m.symbol
-				block.Trades = make([]float64, 0)
-				block.MinPrice = defaultMinPrice
+				block.TradesArray = make([]float64, 0)
+				block.Low = defaultMinPrice
 				block.Time = m.timeFrameDuration
 
 				logs.LogDebug("BINANCE monitor loop started", nil)
@@ -99,17 +99,17 @@ func (m *BinanceMonitor) RunMonitor()  {
 
 						price, _ := strconv.ParseFloat(event.Price, 64)
 						m.mtx.Lock()
-						block.Trades = append(block.Trades, price)
+						block.TradesArray = append(block.TradesArray, price)
 						block.TradesCount++
 
 						quantity, _ := strconv.ParseFloat(event.Quantity, 64)
 						block.Volume += quantity
 
-						if price > block.MaxPrice {
-							block.MaxPrice = price
+						if price > block.High {
+							block.High = price
 						}
-						if price < block.MinPrice {
-							block.MinPrice = price
+						if price < block.Low {
+							block.Low = price
 						}
 
 						m.mtx.Unlock()
@@ -120,17 +120,17 @@ func (m *BinanceMonitor) RunMonitor()  {
 					wsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
 						m.mtx.Lock()
 						price, _ := strconv.ParseFloat(event.Price, 64)
-						block.Trades = append(block.Trades, price)
+						block.TradesArray = append(block.TradesArray, price)
 						block.TradesCount++
 
 						quantity, _ := strconv.ParseFloat(event.Quantity, 64)
 						block.Volume += quantity
 
-						if price > block.MaxPrice {
-							block.MaxPrice = price
+						if price > block.High {
+							block.High = price
 						}
-						if price < block.MinPrice {
-							block.MinPrice = price
+						if price < block.Low {
+							block.Low = price
 						}
 						m.mtx.Unlock()
 					}
@@ -143,12 +143,12 @@ func (m *BinanceMonitor) RunMonitor()  {
 
 				m.mtx.Lock()
 				if block.TradesCount > 0 {
-					block.EntryPrice = block.Trades[0]
-					block.ClosePrice = block.Trades[block.TradesCount-1]
+					block.OpenPrice = block.TradesArray[0]
+					block.ClosePrice = block.TradesArray[block.TradesCount-1]
 					sum := 0.
 
-					for i := range block.Trades {
-						sum += block.Trades[i]
+					for i := range block.TradesArray {
+						sum += block.TradesArray[i]
 					}
 					block.AveragePrice = sum/float64(block.TradesCount)
 					m.mtx.Unlock()

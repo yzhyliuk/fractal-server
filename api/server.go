@@ -26,5 +26,5 @@ func establishRoutes(app *fiber.App)  {
 	app.Use(jwt.New(jwt.Config{}))
 	userRoutes(app)
 	strategyRoutes(app)
-
+	testingRoutes(app)
 }

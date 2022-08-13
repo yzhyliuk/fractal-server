@@ -8,9 +8,11 @@ import (
 func publicRoutes(app *fiber.App)  {
 	userController := &controllers.UserController{}
 	authController := &controllers.AuthController{}
+	uiController := &controllers.UiController{}
 	base := &controllers.BaseController{}
 
 	app.Get("/ping", base.Ping)
+	app.Get("/ui/:form", uiController.GetFormFields)
 
 	app.Post("/auth", authController.Login)
 	usersGroup := app.Group("/users")
@@ -25,6 +27,15 @@ func userRoutes(app *fiber.App)  {
 	usersGroup.Get("/my-info", userController.GetUser)
 	usersGroup.Post("/set-keys", userController.SetKeys)
 	usersGroup.Get("/get-keys", userController.GetKeys)
+}
+
+func testingRoutes(app *fiber.App) {
+	testingController := &controllers.TestingController{}
+	testingGroup := app.Group("/testing")
+	testingGroup.Post("/start-capture", testingController.StartCapture)
+	testingGroup.Get("/stop-capture", testingController.StopCapture)
+	testingGroup.Get("/sessions", testingController.GetSessionsForUser)
+	testingGroup.Get("/delete-session", testingController.DeleteCapture)
 }
 
 func strategyRoutes(app *fiber.App)  {

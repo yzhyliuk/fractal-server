@@ -38,25 +38,25 @@ func (m *BinanceFuturesMonitor) RunWithStrategy(strategy strategy.Strategy)  {
 			case <-m.stopSignal:
 				return
 			default:
-				block := new(block2.Block)
+				block := new(block2.Data)
 				block.Symbol = m.symbol
-				block.Trades = make([]float64, 0)
-				block.MinPrice = defaultMinPrice
+				block.TradesArray = make([]float64, 0)
+				block.Low = defaultMinPrice
 				block.Time = m.timeFrameDuration
 
 				wsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
 					price, _ := strconv.ParseFloat(event.Price, 64)
-					block.Trades = append(block.Trades, price)
+					block.TradesArray = append(block.TradesArray, price)
 					block.TradesCount++
 
 					quantity, _ := strconv.ParseFloat(event.Quantity, 64)
 					block.Volume += quantity
 
-					if price > block.MaxPrice {
-						block.MaxPrice = price
+					if price > block.High {
+						block.High = price
 					}
-					if price < block.MinPrice {
-						block.MinPrice = price
+					if price < block.Low {
+						block.Low = price
 					}
 				}
 
@@ -66,12 +66,12 @@ func (m *BinanceFuturesMonitor) RunWithStrategy(strategy strategy.Strategy)  {
 				stopC <- struct{}{}
 
 				if block.TradesCount > 0 {
-					block.EntryPrice = block.Trades[0]
-					block.ClosePrice = block.Trades[block.TradesCount-1]
+					block.OpenPrice = block.TradesArray[0]
+					block.ClosePrice = block.TradesArray[block.TradesCount-1]
 					sum := 0.
 
-					for i := range block.Trades {
-						sum += block.Trades[i]
+					for i := range block.TradesArray {
+						sum += block.TradesArray[i]
 					}
 					block.AveragePrice = sum/float64(block.TradesCount)
 

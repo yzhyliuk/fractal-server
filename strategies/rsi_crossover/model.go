@@ -25,7 +25,7 @@ type rsiCrossover struct {
 }
 
 // NewRSICrossoverStrategy - creates new RSI crossover strategy
-func NewRSICrossoverStrategy(monitorChannel chan *block.Block, config RSICrossoverConfig, keys *users.Keys, historicalData []*block.Block, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+func NewRSICrossoverStrategy(monitorChannel chan *block.Data, config RSICrossoverConfig, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {
@@ -50,7 +50,7 @@ func NewRSICrossoverStrategy(monitorChannel chan *block.Block, config RSICrossov
 	return newStrategy, nil
 }
 
-func (m *rsiCrossover) HandlerFunc(marketData *block.Block)  {
+func (m *rsiCrossover) HandlerFunc(marketData *block.Data)  {
 	if m.rsiObservations[0] == 0 {
 		return
 	}
@@ -102,7 +102,7 @@ func (m *rsiCrossover) HandlerFunc(marketData *block.Block)  {
 	}
 }
 
-func (m *rsiCrossover) ProcessData(marketData *block.Block)  {
+func (m *rsiCrossover) ProcessData(marketData *block.Data)  {
 	m.closePriceObservations = m.closePriceObservations[1:]
 	m.closePriceObservations = append(m.closePriceObservations, marketData.ClosePrice)
 

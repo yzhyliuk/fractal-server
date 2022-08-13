@@ -14,7 +14,7 @@ type Strategy interface {
 	ExecuteExperimental()
 }
 
-type HandlerFunc func(block *block.Block, orderSpot *binance.CreateOrderResponse, orderFutures *futures.CreateOrderResponse, err error)
+type HandlerFunc func(block *block.Data, orderSpot *binance.CreateOrderResponse, orderFutures *futures.CreateOrderResponse, err error)
 
 type Settings struct {
 	BaseBid float64

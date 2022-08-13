@@ -17,7 +17,7 @@ type templateStrategy struct {
 }
 
 // NewTemplateStrategy - creates new Moving Average crossover strategy
-func NewTemplateStrategy(monitorChannel chan *block.Block, config StrategyTemplateConfig, keys *users.Keys, historicalData []*block.Block, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+func NewTemplateStrategy(monitorChannel chan *block.Data, config StrategyTemplateConfig, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {
@@ -43,9 +43,9 @@ type FrameData struct {
 	Time time.Time `json:"time"`
 }
 
-func (m *templateStrategy) HandlerFunc(marketData *block.Block)  {
+func (m *templateStrategy) HandlerFunc(marketData *block.Data)  {
 
 }
 
-func (m *templateStrategy) ProcessData(marketData *block.Block)  {
+func (m *templateStrategy) ProcessData(marketData *block.Data)  {
 }

@@ -41,7 +41,7 @@ type FrameData struct {
 
 
 // NewMacStrategy - creates new Moving Average crossover strategy
-func NewMacStrategy(monitorChannel chan *block.Block, config MovingAverageCrossoverConfig, keys *users.Keys, historicalData []*block.Block, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+func NewMacStrategy(monitorChannel chan *block.Data, config MovingAverageCrossoverConfig, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {
@@ -64,7 +64,7 @@ func NewMacStrategy(monitorChannel chan *block.Block, config MovingAverageCrosso
 	return strat, nil
 }
 
-func (m *movingAverageCrossover) HandlerFunc(marketData *block.Block)  {
+func (m *movingAverageCrossover) HandlerFunc(marketData *block.Data)  {
 	if m.observations[0] != nil {
 
 		if m.StrategyInstance.Status == instance.StatusCreated {
@@ -82,14 +82,14 @@ func (m *movingAverageCrossover) HandlerFunc(marketData *block.Block)  {
 	}
 }
 
-func (m *movingAverageCrossover) executeSimpleMA(marketData *block.Block) {
+func (m *movingAverageCrossover) executeSimpleMA(marketData *block.Data) {
 	longTerm := m.getAverage(m.config.LongTermPeriod)
 	shortTerm := m.getAverage(m.config.ShortTermPeriod)
 
 	m.evaluate(marketData,longTerm,shortTerm)
 }
 
-func (m *movingAverageCrossover) executeExponentialMA(marketData *block.Block) {
+func (m *movingAverageCrossover) executeExponentialMA(marketData *block.Data) {
 	if m.emaPrevious.LongEMA == 0 || m.emaPrevious.ShortEMA == 0 {
 		m.emaPrevious.LongEMA = m.getAverage(m.config.LongTermPeriod)
 		m.emaPrevious.ShortEMA = m.getAverage(m.config.ShortTermPeriod)
@@ -102,7 +102,7 @@ func (m *movingAverageCrossover) executeExponentialMA(marketData *block.Block) {
 
 }
 
-func (m *movingAverageCrossover) evaluate(marketData *block.Block, longTerm, shortTerm float64)  {
+func (m *movingAverageCrossover) evaluate(marketData *block.Data, longTerm, shortTerm float64)  {
 	if shortTerm > longTerm {
 		logs.LogDebug("Buy order", nil)
 		err := m.HandleBuy(marketData)
@@ -121,10 +121,10 @@ func (m *movingAverageCrossover) evaluate(marketData *block.Block, longTerm, sho
 	logs.LogDebug(fmt.Sprintf("LONG: %f \t SHORT: %f",longTerm, shortTerm), nil)
 }
 
-func (m *movingAverageCrossover) processData(marketData *block.Block)  {
+func (m *movingAverageCrossover) processData(marketData *block.Data)  {
 	sumPerFrame := 0.
-	for i := range marketData.Trades {
-		sumPerFrame += marketData.Trades[i]
+	for i := range marketData.TradesArray {
+		sumPerFrame += marketData.TradesArray[i]
 	}
 	m.observations = m.observations[1:]
 	m.observations = append(m.observations, &dataToStore{Sum: sumPerFrame, Count: marketData.TradesCount})

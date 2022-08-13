@@ -29,7 +29,7 @@ type FrameData struct {
 }
 
 // NewGlideOnPriceStrategy - creates new Moving Average crossover strategy
-func NewGlideOnPriceStrategy(monitorChannel chan *block.Block, config GlideOnPriceConfig, keys *users.Keys, historicalData []*block.Block, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+func NewGlideOnPriceStrategy(monitorChannel chan *block.Data, config GlideOnPriceConfig, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {
@@ -52,7 +52,7 @@ func NewGlideOnPriceStrategy(monitorChannel chan *block.Block, config GlideOnPri
 	return strategy, nil
 }
 
-func (g *glideOnPrice) HandlerFunc(marketData *block.Block)  {
+func (g *glideOnPrice) HandlerFunc(marketData *block.Data)  {
 	if g.observations[0] != 0 {
 
 		if g.StrategyInstance.Status == instance.StatusCreated {
@@ -104,7 +104,7 @@ func (g *glideOnPrice) HandlerFunc(marketData *block.Block)  {
 	}
 }
 
-func (g *glideOnPrice) ProcessData(marketData *block.Block)  {
+func (g *glideOnPrice) ProcessData(marketData *block.Data)  {
 	g.observations = g.observations[1:]
 	g.observations = append(g.observations, marketData.ClosePrice)
 }
