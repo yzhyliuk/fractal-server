@@ -1,24 +1,46 @@
 package block
 
-import "time"
+import (
+	"github.com/lib/pq"
+	"time"
+)
 
-// Block - represents market info block
-type Block struct {
-	Symbol string
+const CapturedDataTableName = "captured_data"
 
-	TradesCount int
-	Time   time.Duration
+// Data - represents market info block
+type Data struct {
+	Symbol string `json:"symbol" gorm:"column:symbol"`
 
-	Volume float64
+	TradesCount int `json:"tradesCount" gorm:"column:tradescount"`
+	Time   time.Duration `json:"-" gorm:"-"`
 
-	MaxPrice float64
-	MinPrice float64
+	Volume float64 `json:"volume" gorm:"column:volume"`
 
-	EntryPrice float64
-	ClosePrice float64
+	High float64 `json:"high" gorm:"column:high"`
+	Low  float64 `json:"low" gorm:"column:low"`
 
-	AveragePrice float64
+	OpenPrice  float64 `json:"openPrice" gorm:"column:openprice"`
+	ClosePrice float64 `json:"closePrice" gorm:"column:closeprice"`
+
+	AveragePrice float64 `json:"averagePrice" gorm:"column:averageprice"`
 
 	// slice of all trades price for given time frame
-	Trades  []float64
+	TradesArray []float64 `json:"trades" gorm:"-"`
+}
+
+// CapturedData - uses for strategy testing
+type CapturedData struct {
+	ID int `json:"id" gorm:"column:id"`
+	Data
+	CaptureID int `json:"captureId" gorm:"column:captureid"`
+	Trades pq.Float64Array `json:"-" gorm:"type:numeric[]"`
+}
+
+func (c *CapturedData) ConvertToDbObject() *CapturedData {
+	c.Trades = pq.Float64Array(c.TradesArray)
+	return c
+}
+
+func (c *CapturedData) TableName() string {
+	return CapturedDataTableName
 }

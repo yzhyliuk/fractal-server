@@ -198,6 +198,26 @@ func (s *StrategyController) Delete(c *fiber.Ctx) error {
 	return c.SendStatus(http.StatusOK)
 }
 
+// DeleteSelected - delete list of selected strategies
+func (s *StrategyController) DeleteSelected(c *fiber.Ctx) error {
+	var ids []int
+	err := c.BodyParser(&ids)
+	if err != nil {
+		return err
+	}
+
+	userInfo, err := s.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	err = instance.DeleteSelectedInstances(s.GetDB(), ids, userInfo.UserID)
+	if err != nil {
+		return err
+	}
+
+	return c.SendStatus(http.StatusOK)
+}
 
 // GetTradesForInstance - returns all the trades for given strategy instance
 func (s *StrategyController) GetTradesForInstance(c *fiber.Ctx) error  {
@@ -221,6 +241,21 @@ func (s *StrategyController) GetTradesForInstance(c *fiber.Ctx) error  {
 	}
 
 	return c.JSON(trades)
+}
+
+func (s *StrategyController) ArchiveStrategies(c *fiber.Ctx) error {
+	var ids []int
+	err := c.BodyParser(&ids)
+	if err != nil {
+		return err
+	}
+
+	err = instance.MoveInstancesToArchive(s.GetDB(), ids)
+	if err != nil {
+		return err
+	}
+
+	return c.SendStatus(http.StatusOK)
 }
 
 func (s *StrategyController) RunArbitrage(c *fiber.Ctx) error  {

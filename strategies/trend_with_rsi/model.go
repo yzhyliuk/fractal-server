@@ -34,7 +34,7 @@ type FrameData struct {
 }
 
 // NewTrendFollowWithRSIStrategy - creates new Moving Average crossover strategy
-func NewTrendFollowWithRSIStrategy(monitorChannel chan *block.Block, config TrendWithRSIConfig, keys *users.Keys, historicalData []*block.Block, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+func NewTrendFollowWithRSIStrategy(monitorChannel chan *block.Data, config TrendWithRSIConfig, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {
@@ -58,7 +58,7 @@ func NewTrendFollowWithRSIStrategy(monitorChannel chan *block.Block, config Tren
 	return newStrategy, nil
 }
 
-func (t *trendWithRSIStrategy) HandlerFunc(marketData *block.Block)  {
+func (t *trendWithRSIStrategy) HandlerFunc(marketData *block.Data)  {
 	if t.movingAverageObservations[0] != nil && t.closePriceObservations[0] != 0{
 		if t.StrategyInstance.Status == instance.StatusCreated {
 			t.StrategyInstance.Status = instance.StatusRunning
@@ -79,7 +79,7 @@ func (t *trendWithRSIStrategy) HandlerFunc(marketData *block.Block)  {
 	}
 }
 
-func (t *trendWithRSIStrategy) Evaluate(marketData *block.Block, rsi float64, uptrend, rsiOverbought, rsiOversold bool)  {
+func (t *trendWithRSIStrategy) Evaluate(marketData *block.Data, rsi float64, uptrend, rsiOverbought, rsiOversold bool)  {
 	if t.LastTrade != nil {
 		if t.orderUptrend != uptrend{
 			t.CloseAllTrades()
@@ -111,10 +111,10 @@ func (t *trendWithRSIStrategy) Evaluate(marketData *block.Block, rsi float64, up
 	}
 }
 
-func (t *trendWithRSIStrategy) ProcessData(marketData *block.Block)  {
+func (t *trendWithRSIStrategy) ProcessData(marketData *block.Data)  {
 	sumPerFrame := 0.
-	for i := range marketData.Trades {
-		sumPerFrame += marketData.Trades[i]
+	for i := range marketData.TradesArray {
+		sumPerFrame += marketData.TradesArray[i]
 	}
 	t.movingAverageObservations = t.movingAverageObservations[1:]
 	t.movingAverageObservations = append(t.movingAverageObservations, &dataToStore{Sum: sumPerFrame, Count: marketData.TradesCount})

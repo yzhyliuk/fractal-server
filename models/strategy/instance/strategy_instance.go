@@ -27,6 +27,7 @@ type StrategyInstance struct {
 	StopLoss float64 `json:"stopLoss" gorm:"-"`
 	TradeStopLoss float64 `json:"tradeStopLoss" gorm:"-"`
 	TradeTakeProfit float64 `json:"tradeTakeProfit" gorm:"-"`
+	Archived bool `json:"archived" gorm:"archived"`
 }
 
 type StrategyMonitoring struct {
@@ -104,11 +105,34 @@ func DeleteInstance(db *gorm.DB, instanceID, userID int) error {
 	return err
 }
 
+// DeleteSelectedInstances - deletes selected strategies
+func DeleteSelectedInstances(db *gorm.DB, ids []int, userID int) error {
+	for _, id := range ids {
+		err := DeleteInstance(db, id, userID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // UpdateStatus - updates status of running instance
 func UpdateStatus(db *gorm.DB, instanceID int, status string) error {
 	err := db.Table(strategyInstancesTableName).Where("id = ?", instanceID).Update("status",status).Error
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func MoveInstancesToArchive(db *gorm.DB, ids []int) error {
+	for _, id := range ids {
+		err := db.Table(strategyInstancesTableName).Where("id = ?", id).Update("archived", true).Error
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/adshao/go-binance/v2 v2.3.4
 	github.com/gofiber/fiber/v2 v2.32.0
+	github.com/lib/pq v1.10.2
 	golang.org/x/crypto v0.0.0-20220427172511-eb4f295cb31f
 	gorm.io/driver/postgres v1.3.5
 	gorm.io/gorm v1.23.5

@@ -75,14 +75,14 @@ func (e *experimentalContinuousStrategy) Start()  {
 			}
 
 			if price < mean-(sd*3) {
-				err := e.HandleBuy(&block.Block{
+				err := e.HandleBuy(&block.Data{
 					ClosePrice: price,
 				})
 				if err != nil {
 					logs.LogDebug("", err)
 				}
 			} else if price > mean+(sd*3) {
-				err := e.HandleSell(&block.Block{
+				err := e.HandleSell(&block.Data{
 					ClosePrice: price,
 				})
 				if err != nil {

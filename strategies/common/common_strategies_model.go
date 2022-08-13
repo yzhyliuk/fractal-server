@@ -16,15 +16,15 @@ import (
 type Strategy struct {
 	StrategyInstance *instance.StrategyInstance
 	Account account.Account
-	MonitorChannel chan *block.Block
+	MonitorChannel chan *block.Data
 	StopSignal chan bool
 	LastTrade *trade.Trade
 
 	TotalProfit float64
 
 	Stopped bool
-	HandlerFunction func(marketData *block.Block)
-	DataProcessFunction func(marketData *block.Block)
+	HandlerFunction func(marketData *block.Data)
+	DataProcessFunction func(marketData *block.Data)
 	ExperimentalHandler func()
 }
 
@@ -56,7 +56,7 @@ func (m *Strategy) Execute()  {
 	}()
 }
 
-func (m *Strategy) HandleTPansSL(marketData *block.Block)  {
+func (m *Strategy) HandleTPansSL(marketData *block.Data)  {
 	if  m.LastTrade == nil {
 		return
 	}
@@ -118,7 +118,7 @@ func (m *Strategy) StopLossCondition() bool {
 	return false
 }
 
-func (m *Strategy) HandleSell(marketData *block.Block) error {
+func (m *Strategy) HandleSell(marketData *block.Data) error {
 	if m.StrategyInstance.IsFutures {
 		if m.LastTrade == nil {
 			return m.sell(marketData)
@@ -134,7 +134,7 @@ func (m *Strategy) HandleSell(marketData *block.Block) error {
 
 
 
-func (m *Strategy) HandleBuy(marketData *block.Block) error {
+func (m *Strategy) HandleBuy(marketData *block.Data) error {
 	if m.StrategyInstance.IsFutures {
 		if m.LastTrade == nil {
 			return m.buy(marketData)
@@ -149,7 +149,7 @@ func (m *Strategy) HandleBuy(marketData *block.Block) error {
 }
 
 // buy - preforms buy
-func (m *Strategy) buy(marketData *block.Block) error {
+func (m *Strategy) buy(marketData *block.Data) error {
 	quantity := account.QuantityFromPrice(m.StrategyInstance.Bid, marketData.ClosePrice)
 
 	if m.StrategyInstance.IsFutures {
@@ -174,7 +174,7 @@ func (m *Strategy) buy(marketData *block.Block) error {
 	return nil
 }
 
-func (m *Strategy) sell(marketData *block.Block) error {
+func (m *Strategy) sell(marketData *block.Data) error {
 	if m.StrategyInstance.IsFutures {
 		if m.LastTrade != nil {
 			m.closePreviousTrade()
