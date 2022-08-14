@@ -60,7 +60,8 @@ func (m *Strategy) Execute()  {
 }
 
 func (m *Strategy) HandleTPansSL(marketData *block.Data)  {
-	if  m.LastTrade == nil {
+	// TODO : TP and SL for spot trading
+	if  m.LastTrade == nil || !m.StrategyInstance.IsFutures{
 		return
 	}
 	currentClose := marketData.ClosePrice
