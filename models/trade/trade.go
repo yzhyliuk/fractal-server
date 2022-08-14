@@ -100,7 +100,11 @@ func (t *Trade) CalculateProfitRoi() {
 
 	profit -= 2*fee
 
-	roi = profit / (t.USD / float64(*t.Leverage))
+	if t.IsFutures {
+		roi = profit / (t.USD / float64(*t.Leverage))
+	} else {
+		roi = profit / t.USD
+	}
 
 	t.Profit = profit
 	t.ROI = roi
