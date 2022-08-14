@@ -36,6 +36,12 @@ type CapturedData struct {
 	Trades pq.Float64Array `json:"-" gorm:"type:numeric[]"`
 }
 
+func (c *CapturedData) ExtractData() *Data {
+	dat := c.Data
+	dat.TradesArray = c.Trades
+	return &dat
+}
+
 func (c *CapturedData) ConvertToDbObject() *CapturedData {
 	c.Trades = pq.Float64Array(c.TradesArray)
 	return c

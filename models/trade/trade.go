@@ -10,6 +10,9 @@ const TradesTableName = "trades"
 const StatusActive = "active"
 const StatusClosed = "closed"
 
+const BinanceFuturesTakerFeeRate = 0.0004
+const BinanceSpotTakerFee = 0.00075
+
 
 // Trade - represents trade instance
 type Trade struct {
@@ -77,4 +80,24 @@ func GetTradesByInstanceID(db *gorm.DB, userID, instanceID int) ([]*Trade, error
 		return nil, err
 	}
 	return trades, nil
+}
+
+func (t *Trade) CalculateProfitRoi() {
+	roi := 0.
+	profit := 0.
+	fee := t.USD*BinanceFuturesTakerFeeRate
+
+	switch t.FuturesSide {
+	case futures.SideTypeBuy:
+		profit = (t.Quantity*t.PriceClose)-t.USD
+	case futures.SideTypeSell:
+		profit = (t.Quantity*t.PriceOpen)-(t.Quantity*t.PriceClose)
+	}
+
+	profit -= 2*fee
+
+	roi = profit / (t.USD / float64(*t.Leverage))
+
+	t.Profit = profit
+	t.ROI = roi
 }

@@ -6,7 +6,7 @@ import (
 	"newTradingBot/storage"
 )
 
-func RunExperimentalContinuousStrategy(userID int, rawConfig []byte) error{
+func RunExperimentalContinuousStrategy(userID int, rawConfig []byte, testing int, session *int) error{
 	var config continuousConfig
 
 	err := json.Unmarshal(rawConfig, &config)
