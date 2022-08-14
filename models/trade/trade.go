@@ -87,11 +87,15 @@ func (t *Trade) CalculateProfitRoi() {
 	profit := 0.
 	fee := t.USD*BinanceFuturesTakerFeeRate
 
-	switch t.FuturesSide {
-	case futures.SideTypeBuy:
+	if t.IsFutures {
+		switch t.FuturesSide {
+		case futures.SideTypeBuy:
+			profit = (t.Quantity*t.PriceClose)-t.USD
+		case futures.SideTypeSell:
+			profit = (t.Quantity*t.PriceOpen)-(t.Quantity*t.PriceClose)
+		}
+	} else {
 		profit = (t.Quantity*t.PriceClose)-t.USD
-	case futures.SideTypeSell:
-		profit = (t.Quantity*t.PriceOpen)-(t.Quantity*t.PriceClose)
 	}
 
 	profit -= 2*fee
