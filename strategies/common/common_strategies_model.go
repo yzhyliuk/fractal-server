@@ -10,6 +10,7 @@ import (
 	"newTradingBot/models/block"
 	"newTradingBot/models/strategy/actions"
 	"newTradingBot/models/strategy/instance"
+	"newTradingBot/models/testing"
 	"newTradingBot/models/trade"
 )
 
@@ -20,6 +21,7 @@ type Strategy struct {
 	StopSignal chan bool
 	LastTrade *trade.Trade
 
+	trades []*trade.Trade
 	TotalProfit float64
 
 	Stopped bool
@@ -30,6 +32,7 @@ type Strategy struct {
 
 func (m *Strategy) Execute()  {
 	m.TotalProfit = 0
+	m.trades = make([]*trade.Trade, 0)
 	go func() {
 		for  {
 			select {
@@ -80,12 +83,20 @@ func (m *Strategy) HandleTPansSL(marketData *block.Data)  {
 
 	if m.StrategyInstance.TradeStopLoss != 0 {
 		if roi < m.StrategyInstance.TradeStopLoss*-1 {
+			if m.StrategyInstance.Testing == testing.BackTest {
+				m.TestingCloseTrade(marketData)
+				return
+			}
 			m.CloseAllTrades()
 		}
 	}
 
 	if m.StrategyInstance.TradeTakeProfit != 0 {
 		if roi > m.StrategyInstance.TradeTakeProfit {
+			if m.StrategyInstance.Testing == testing.BackTest {
+				m.TestingCloseTrade(marketData)
+				return
+			}
 			m.CloseAllTrades()
 		}
 	}
@@ -97,6 +108,10 @@ func (m *Strategy) ExecuteExperimental()  {
 
 func (m *Strategy) GetInstance() *instance.StrategyInstance {
 	return m.StrategyInstance
+}
+
+func (m *Strategy) GetTestingTrades() []*trade.Trade {
+	return m.trades
 }
 
 func (m *Strategy) StopLossCondition() bool {
@@ -152,6 +167,11 @@ func (m *Strategy) HandleBuy(marketData *block.Data) error {
 func (m *Strategy) buy(marketData *block.Data) error {
 	quantity := account.QuantityFromPrice(m.StrategyInstance.Bid, marketData.ClosePrice)
 
+	if m.StrategyInstance.Testing == testing.BackTest {
+		m.TestingBuy(marketData, quantity)
+		return nil
+	}
+
 	if m.StrategyInstance.IsFutures {
 		if m.LastTrade != nil {
 			m.closePreviousTrade()
@@ -175,6 +195,12 @@ func (m *Strategy) buy(marketData *block.Data) error {
 }
 
 func (m *Strategy) sell(marketData *block.Data) error {
+	quantity := account.QuantityFromPrice(m.StrategyInstance.Bid, marketData.ClosePrice)
+	if m.StrategyInstance.Testing == testing.BackTest {
+		m.TestingSell(marketData, quantity)
+		return nil
+	}
+
 	if m.StrategyInstance.IsFutures {
 		if m.LastTrade != nil {
 			m.closePreviousTrade()
@@ -182,7 +208,6 @@ func (m *Strategy) sell(marketData *block.Data) error {
 				return nil
 			}
 		}
-		quantity := account.QuantityFromPrice(m.StrategyInstance.Bid, marketData.ClosePrice)
 		futuresTrade, err := m.Account.OpenFuturesPosition(quantity, m.StrategyInstance.Pair, futures.SideTypeSell, m.StrategyInstance)
 		if err != nil {
 			return err
@@ -204,6 +229,9 @@ func (m *Strategy) sell(marketData *block.Data) error {
 }
 
 func (m *Strategy) closePreviousTrade()  {
+	if m.StrategyInstance.Testing != 0 {
+		return
+	}
 	tradeClosed, err := m.Account.CloseFuturesPosition(m.LastTrade)
 	if err != nil {
 		logs.LogDebug("", err)
@@ -214,7 +242,7 @@ func (m *Strategy) closePreviousTrade()  {
 }
 
 func (m *Strategy) Stop()  {
-	db, err := database.GetDataBaseConnection()
+		db, err := database.GetDataBaseConnection()
 	if err != nil {
 		logs.LogDebug("", err)
 	}
@@ -240,3 +268,68 @@ func (m *Strategy) CloseAllTrades() {
 	}
 }
 
+func (m *Strategy) TestingBuy(marketData *block.Data, quantity float64)  {
+	newTrade := &trade.Trade{
+		Quantity: quantity,
+		USD: m.StrategyInstance.Bid,
+		PriceOpen: marketData.ClosePrice,
+		FuturesSide: futures.SideTypeBuy,
+	}
+
+	if m.StrategyInstance.IsFutures {
+		if m.LastTrade != nil && m.LastTrade.FuturesSide == futures.SideTypeBuy {
+			return
+		}
+
+		if m.LastTrade != nil && m.LastTrade.FuturesSide == futures.SideTypeSell {
+			m.TestingCloseTrade(marketData)
+
+			newTrade.Leverage = m.StrategyInstance.Leverage
+			m.LastTrade = newTrade
+		}
+		if m.LastTrade == nil {
+			newTrade.Leverage = m.StrategyInstance.Leverage
+			m.LastTrade = newTrade
+		}
+	} else {
+		if m.LastTrade == nil {
+			m.LastTrade = newTrade
+		}
+	}
+}
+
+func (m *Strategy) TestingSell(marketData *block.Data, quantity float64)  {
+	newTrade := &trade.Trade{
+		Quantity: quantity,
+		USD: m.StrategyInstance.Bid,
+		PriceOpen: marketData.ClosePrice,
+		FuturesSide: futures.SideTypeSell,
+	}
+
+	if m.StrategyInstance.IsFutures {
+		if m.LastTrade != nil && m.LastTrade.FuturesSide == futures.SideTypeSell {
+			return
+		}
+
+		if m.LastTrade != nil && m.LastTrade.FuturesSide == futures.SideTypeBuy {
+			m.TestingCloseTrade(marketData)
+		}
+
+		if m.LastTrade == nil {
+			newTrade.Leverage = m.StrategyInstance.Leverage
+			m.LastTrade = newTrade
+		}
+	} else {
+		m.TestingCloseTrade(marketData)
+	}
+}
+
+func (m *Strategy) TestingCloseTrade(marketData *block.Data)  {
+	if m.LastTrade != nil {
+		closedTrade := m.LastTrade
+		closedTrade.PriceClose = marketData.ClosePrice
+		closedTrade.CalculateProfitRoi()
+		m.trades = append(m.trades, closedTrade)
+		m.LastTrade = nil
+	}
+}

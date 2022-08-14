@@ -5,6 +5,7 @@ import (
 	"github.com/adshao/go-binance/v2/futures"
 	"newTradingBot/models/block"
 	"newTradingBot/models/strategy/instance"
+	"newTradingBot/models/trade"
 )
 
 type Strategy interface {
@@ -12,6 +13,7 @@ type Strategy interface {
 	GetInstance() *instance.StrategyInstance
 	Stop()
 	ExecuteExperimental()
+	GetTestingTrades() []*trade.Trade
 }
 
 type HandlerFunc func(block *block.Data, orderSpot *binance.CreateOrderResponse, orderFutures *futures.CreateOrderResponse, err error)

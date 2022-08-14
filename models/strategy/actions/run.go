@@ -5,8 +5,11 @@ import (
 	"newTradingBot/api/database"
 	"newTradingBot/models/block"
 	"newTradingBot/models/monitoring"
+	"newTradingBot/models/monitoring/replay"
+	"newTradingBot/models/recording"
 	"newTradingBot/models/strategy/configs"
 	"newTradingBot/models/strategy/instance"
+	"newTradingBot/models/testing"
 	"newTradingBot/models/users"
 	"newTradingBot/storage"
 	"time"
@@ -65,4 +68,35 @@ func PrepareExperimentalStrategy(conf configs.BaseStrategyConfig, userID int, st
 	}
 
 	return inst, &keys, nil
+}
+
+func PrepareBackTesting(conf configs.BaseStrategyConfig, captureSession, userID, strategyID int) (*instance.StrategyInstance, *replay.MonitorReplay, *users.Keys, error) {
+	db, err := database.GetDataBaseConnection()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var session recording.CapturedSession
+	err = db.Where("id = ?", captureSession).Find(&session).Error
+	if err != nil {
+		return nil, nil, nil ,err
+	}
+
+	conf.Pair = session.Symbol
+	conf.IsFutures = session.IsFutures
+
+	inst := instance.GetInstanceFromConfig(conf, userID, strategyID)
+
+	inst.TimeFrame = session.TimeFrame
+	inst.Testing = testing.BackTest
+
+	keys, err := users.GetUserKeys(db, userID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	replayMonitor := replay.NewMonitorReplay(captureSession)
+
+	return inst, replayMonitor, &keys, nil
+
 }

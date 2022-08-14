@@ -1,10 +1,13 @@
 package controllers
 
 import (
+	"encoding/json"
 	"github.com/gofiber/fiber/v2"
 	"net/http"
+	"newTradingBot/api/common"
 	"newTradingBot/models/recording"
 	"newTradingBot/models/recording/actions"
+	"newTradingBot/models/testing"
 	"strconv"
 )
 
@@ -79,4 +82,52 @@ func (t *TestingController) DeleteCapture(c *fiber.Ctx) error {
 	}
 
 	return c.SendStatus(http.StatusOK)
+}
+
+func (t *TestingController) RunBackTest(c *fiber.Ctx) error {
+	strategy, err := strconv.Atoi(c.Params("strategy"))
+	if err != nil {
+		return err
+	}
+
+	session, err := strconv.Atoi(c.Params("session"))
+	if err != nil {
+		return err
+	}
+
+	var config interface{}
+
+	err = c.BodyParser(&config)
+	if err != nil {
+		return err
+	}
+
+	rawConfig, err := json.Marshal(&config)
+	if err != nil {
+		return err
+	}
+
+	userinfo, err := t.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	trades, err := common.RunStrategy[strategy](userinfo.UserID, rawConfig, testing.BackTest, &session)
+	if err != nil {
+		return err
+	}
+
+	profit, winRate, roi := testing.GetProfitWinRateAndRoiForTrades(trades)
+
+	return c.JSON(struct {
+		Profit float64 `json:"profit"`
+		WinRate float64 `json:"winRate"`
+		Roi float64 `json:"roi"`
+		TradesClosed int `json:"tradesClosed"`
+	}{
+		Profit: profit,
+		WinRate: winRate,
+		Roi: roi,
+		TradesClosed: len(trades),
+	})
 }

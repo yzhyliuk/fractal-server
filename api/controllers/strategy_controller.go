@@ -10,6 +10,7 @@ import (
 	"newTradingBot/models/apimodels"
 	"newTradingBot/models/strategy/actions"
 	"newTradingBot/models/strategy/instance"
+	"newTradingBot/models/testing"
 	"newTradingBot/models/trade"
 	"newTradingBot/models/users"
 	"strconv"
@@ -109,7 +110,7 @@ func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
 		return err
 	}
 
-	err = common.RunStrategy[strategyID](userinfo.UserID, rawConfig)
+	_, err = common.RunStrategy[strategyID](userinfo.UserID, rawConfig, testing.Disable, nil)
 	if err != nil {
 		return err
 	}

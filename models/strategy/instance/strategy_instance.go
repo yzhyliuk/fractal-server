@@ -28,6 +28,8 @@ type StrategyInstance struct {
 	TradeStopLoss float64 `json:"tradeStopLoss" gorm:"-"`
 	TradeTakeProfit float64 `json:"tradeTakeProfit" gorm:"-"`
 	Archived bool `json:"archived" gorm:"archived"`
+
+	Testing int `json:"testing" gorm:"-"`
 }
 
 type StrategyMonitoring struct {
