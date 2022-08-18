@@ -27,9 +27,9 @@ func RunGlideOnPrice(userID int, rawConfig []byte, test int, sessionID *int) ([]
 	var replayMonitor *replay.MonitorReplay
 
 	if test == testing.Disable {
-		inst, monitorChannel, keys, err = actions.PrepareStrategy(config.BaseStrategyConfig, userID, 1)
+		inst, monitorChannel, keys, err = actions.PrepareStrategy(config.BaseStrategyConfig, userID, 2)
 	} else if test == testing.BackTest{
-		inst, replayMonitor, keys, err = actions.PrepareBackTesting(config.BaseStrategyConfig, *sessionID, userID, 1)
+		inst, replayMonitor, keys, err = actions.PrepareBackTesting(config.BaseStrategyConfig, *sessionID, userID, 2)
 		monitorChannel = replayMonitor.OutputChannel
 	} else if test == testing.LiveTest {
 
