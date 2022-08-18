@@ -8,6 +8,7 @@ import (
 	"newTradingBot/models/recording"
 	"newTradingBot/models/recording/actions"
 	"newTradingBot/models/testing"
+	"newTradingBot/models/trade"
 	"strconv"
 )
 
@@ -124,10 +125,12 @@ func (t *TestingController) RunBackTest(c *fiber.Ctx) error {
 		WinRate float64 `json:"winRate"`
 		Roi float64 `json:"roi"`
 		TradesClosed int `json:"tradesClosed"`
+		Trades []*trade.Trade `json:"trades"`
 	}{
 		Profit: profit,
 		WinRate: winRate,
 		Roi: roi,
 		TradesClosed: len(trades),
+		Trades: trades,
 	})
 }

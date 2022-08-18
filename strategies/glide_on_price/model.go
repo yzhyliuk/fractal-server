@@ -20,6 +20,7 @@ type glideOnPrice struct {
 	config GlideOnPriceConfig
 
 	observations []float64
+	prevMarketData *block.Data
 }
 
 type FrameData struct {
