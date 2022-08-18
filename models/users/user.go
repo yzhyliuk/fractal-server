@@ -69,3 +69,19 @@ func GetByEmail(db *gorm.DB, email string) (*User, error)  {
 	err := db.Where("email = ?", email).Find(&user).Error
 	return &user, err
 }
+
+func GetUserByUsername(db *gorm.DB, username string) (*User, error) {
+	var user User
+	err := db.Where("username = ?", username).Find(&user).Error
+	return &user, err
+}
+
+func GetUserByID(db *gorm.DB, userID int) (*User, error) {
+	var user User
+	err := db.Where("id = ?", userID).Find(&user).Error
+	return &user, err
+}
+
+func UpdateUserName(db *gorm.DB, userID int, username string) error {
+	return db.Table(tableName).Where("id = ?", userID).Update("username", username).Error
+}

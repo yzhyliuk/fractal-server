@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"net/http"
 	"newTradingBot/models/auth"
+	"newTradingBot/models/permissions"
 	"newTradingBot/models/users"
 )
 
@@ -39,16 +40,19 @@ func (u *UserController) CreateUser(c *fiber.Ctx) error {
 }
 
 
-// GetUser TODO : Remove this test method
+// GetUser - returns user Info or 401 error TODO : Remove this test method
 func (u *UserController) GetUser(c *fiber.Ctx) error  {
 	userInfo, err := u.GetUserInfo(c)
 	if err != nil {
 		return c.SendStatus(http.StatusUnauthorized)
 	}
 
+	use, err := users.GetUserByID(u.GetDB(), userInfo.UserID)
+	if err != nil {
+		return err
+	}
 
-
-	return c.JSON(userInfo)
+	return c.JSON(use)
 }
 
 func (u *UserController) SetKeys(c *fiber.Ctx) error  {
@@ -68,6 +72,27 @@ func (u *UserController) SetKeys(c *fiber.Ctx) error  {
 	keysFromUser.UserID = userInfo.UserID
 
 	err = users.SaveUserKeys(u.GetDB(), &keysFromUser)
+	if err != nil {
+		return err
+	}
+
+	return c.SendStatus(http.StatusOK)
+}
+
+func (u *UserController) UpdateUser(c *fiber.Ctx) error {
+	var userUpdated *users.User
+
+	err := c.BodyParser(&userUpdated)
+	if err != nil {
+		return err
+	}
+
+	userInfo, err := u.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	err = users.UpdateUserName(u.GetDB(), userInfo.UserID, userUpdated.Username)
 	if err != nil {
 		return err
 	}
@@ -105,4 +130,81 @@ func (u *UserController) GetUserBalance(c *fiber.Ctx) error {
 
 	return c.JSON(finance)
 
+}
+
+func (u *UserController) CreatePermission(c *fiber.Ctx) error {
+	userInfo, err := u.GetUserInfo(c)
+	var permissisonTable permissions.PermissionTable
+
+	err = c.BodyParser(&permissisonTable)
+	if err != nil {
+		return err
+	}
+
+	childUser, err := users.GetUserByUsername(u.GetDB(), permissisonTable.ChildUsername)
+	if err != nil {
+		return err
+	}
+
+	permissisonTable.OriginUser = userInfo.UserID
+	permissisonTable.ChildUser = childUser.ID
+
+	err = permissions.CreatePermission(u.GetDB(), permissisonTable)
+	if err != nil {
+		return err
+	}
+
+	return c.SendStatus(http.StatusOK)
+}
+
+func (u *UserController) UpdateUserPermission(c *fiber.Ctx) error {
+	userInfo, err := u.GetUserInfo(c)
+	var permissisonTable permissions.PermissionTable
+
+	err = c.BodyParser(&permissisonTable)
+	if err != nil {
+		return err
+	}
+
+	permissisonTable.OriginUser = userInfo.UserID
+
+	err = permissions.UpdatePermissionTable(u.GetDB(), permissisonTable)
+	if err != nil {
+		return err
+	}
+
+	return c.SendStatus(http.StatusOK)
+}
+
+func (u *UserController) GetAllowedUsers(c *fiber.Ctx) error {
+	userInfo, err := u.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	permissionsTable, err := permissions.GetAllowedUsers(u.GetDB(), userInfo.UserID)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(permissionsTable)
+}
+
+func (u *UserController) DeletePermission(c *fiber.Ctx) error {
+	userInfo, err := u.GetUserInfo(c)
+	var permissisonTable permissions.PermissionTable
+
+	err = c.BodyParser(&permissisonTable)
+	if err != nil {
+		return err
+	}
+
+	permissisonTable.OriginUser = userInfo.UserID
+
+	err = permissions.DeletePermissionTable(u.GetDB(), permissisonTable)
+	if err != nil {
+		return err
+	}
+
+	return c.SendStatus(http.StatusOK)
 }

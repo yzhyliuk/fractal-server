@@ -22,7 +22,16 @@ func (t *TestingController) GetSessionsForUser(c *fiber.Ctx) error {
 		return err
 	}
 
-	sessions, err := recording.GetAllSessionForUser(t.GetDB(), userInfo.UserID)
+	withPermissions := c.Query("withPermissions")
+
+	var sessions []*recording.CapturedSession
+
+	if withPermissions == "true" {
+		sessions, err = recording.GetSessionsForUserWithPermissions(t.GetDB(), userInfo.UserID)
+	} else  {
+		sessions, err = recording.GetAllSessionForUser(t.GetDB(), userInfo.UserID)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -77,7 +86,12 @@ func (t *TestingController) DeleteCapture(c *fiber.Ctx) error {
 		return err
 	}
 
-	err = actions.DeleteCaptureSession(t.GetDB(), captureSessionID)
+	userinfo, err := t.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	err = actions.DeleteCaptureSession(t.GetDB(), userinfo.UserID,captureSessionID)
 	if err != nil {
 		return err
 	}
