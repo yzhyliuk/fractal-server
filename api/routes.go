@@ -27,6 +27,11 @@ func userRoutes(app *fiber.App)  {
 	usersGroup.Get("/my-info", userController.GetUser)
 	usersGroup.Post("/set-keys", userController.SetKeys)
 	usersGroup.Get("/get-keys", userController.GetKeys)
+	usersGroup.Post("/update", userController.UpdateUser)
+	usersGroup.Post("/permission", userController.CreatePermission)
+	usersGroup.Put("/permission", userController.UpdateUserPermission)
+	usersGroup.Get("/permission", userController.GetAllowedUsers)
+	usersGroup.Post("/permission/delete", userController.DeletePermission)
 }
 
 func testingRoutes(app *fiber.App) {
