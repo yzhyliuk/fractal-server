@@ -18,7 +18,7 @@ type movingAverageCrossover struct {
 	common.Strategy
 
 	config MovingAverageCrossoverConfig
-	observations []*dataToStore
+	observations []float64
 
 	emaPrevious emaData
 }
@@ -48,7 +48,8 @@ func NewMacStrategy(monitorChannel chan *block.Data, config MovingAverageCrossov
 		return nil, err
 	}
 
-	observations := make([]*dataToStore, config.LongTermPeriod)
+	//observations := make([]*dataToStore, config.LongTermPeriod)
+	observations := make([]float64, config.LongTermPeriod)
 
 	strat := &movingAverageCrossover{
 		config: config,
@@ -65,7 +66,7 @@ func NewMacStrategy(monitorChannel chan *block.Data, config MovingAverageCrossov
 }
 
 func (m *movingAverageCrossover) HandlerFunc(marketData *block.Data)  {
-	if m.observations[0] != nil {
+	if m.observations[0] != 0 {
 
 		if m.StrategyInstance.Status == instance.StatusCreated {
 			m.StrategyInstance.Status = instance.StatusRunning
@@ -98,6 +99,9 @@ func (m *movingAverageCrossover) executeExponentialMA(marketData *block.Data) {
 	longEMA := indicators.ExponentialMA(m.config.LongTermPeriod, m.emaPrevious.LongEMA, m.getAverage(m.config.LongTermPeriod))
 	shortEMA := indicators.ExponentialMA(m.config.ShortTermPeriod, m.emaPrevious.ShortEMA, m.getAverage(m.config.ShortTermPeriod))
 
+	m.emaPrevious.LongEMA = longEMA
+	m.emaPrevious.ShortEMA = shortEMA
+
 	m.evaluate(marketData, longEMA, shortEMA)
 
 }
@@ -122,23 +126,21 @@ func (m *movingAverageCrossover) evaluate(marketData *block.Data, longTerm, shor
 }
 
 func (m *movingAverageCrossover) processData(marketData *block.Data)  {
-	sumPerFrame := 0.
-	for i := range marketData.TradesArray {
-		sumPerFrame += marketData.TradesArray[i]
-	}
+	//sumPerFrame := 0.
+	//for i := range marketData.TradesArray {
+	//	sumPerFrame += marketData.TradesArray[i]
+	//}
 	m.observations = m.observations[1:]
-	m.observations = append(m.observations, &dataToStore{Sum: sumPerFrame, Count: marketData.TradesCount})
+	m.observations = append(m.observations, marketData.ClosePrice)
 }
 
 func (m *movingAverageCrossover) getAverage(timeFrames int) float64  {
-	sum := 0.
-	count := 0
+	frame := make([]float64, 0)
 	length := len(m.observations)-1
 	for i := length; i > length - timeFrames; i-- {
-		sum += m.observations[i].Sum
-		count += m.observations[i].Count
+		frame = append(frame, m.observations[i])
 	}
 
-	return sum/float64(count)
+	return indicators.Average(frame)
 }
 
