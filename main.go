@@ -21,8 +21,10 @@ func main()  {
 
 	if mode != nil && *mode == configuration.Prod {
 		configuration.Mode = configuration.Prod
-	} else  {
+	} else if *mode == configuration.Dev {
 		configuration.Mode = configuration.Dev
+	} else {
+		configuration.Mode =configuration.DebugProd
 	}
 
 	c := make(chan os.Signal,1)
