@@ -21,6 +21,8 @@ type movingAverageCrossover struct {
 	observations []float64
 
 	emaPrevious emaData
+
+	prevTrend bool
 }
 
 type dataToStore struct {
@@ -56,6 +58,7 @@ func NewMacStrategy(monitorChannel chan *block.Data, config MovingAverageCrossov
 		observations: observations,
 	}
 	strat.Account = acc
+	strat.prevTrend = false
 	strat.StopSignal = make(chan bool)
 	strat.MonitorChannel = monitorChannel
 	strat.StrategyInstance = inst
@@ -107,7 +110,16 @@ func (m *movingAverageCrossover) executeExponentialMA(marketData *block.Data) {
 }
 
 func (m *movingAverageCrossover) evaluate(marketData *block.Data, longTerm, shortTerm float64)  {
+
+	currentTrend := shortTerm > longTerm
+	trendChange := currentTrend != m.prevTrend
+	m.prevTrend = currentTrend
+	if !trendChange {
+		return
+	}
+
 	if shortTerm > longTerm {
+		m.prevTrend = true
 		logs.LogDebug("Buy order", nil)
 		err := m.HandleBuy(marketData)
 		if err != nil {
