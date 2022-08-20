@@ -209,6 +209,7 @@ func (t *qqeStrategy) Evaluate(marketData *block.Data, qqeLong, qqeShort *float6
 func (t *qqeStrategy) CrossLong(rsiIndex float64) bool {
 	curr := (t.prevLongband / rsiIndex) > 1
 	if curr != t.crossLong {
+		t.crossLong = curr
 		return true
 	}
 	t.crossLong = curr
@@ -218,6 +219,7 @@ func (t *qqeStrategy) CrossLong(rsiIndex float64) bool {
 func (t *qqeStrategy) CrossShort(rsiIndex float64) bool {
 	curr := (t.prevShortband / rsiIndex) > 1
 	if curr != t.crossShort {
+		t.crossShort = curr
 		return true
 	}
 	t.crossShort = curr
