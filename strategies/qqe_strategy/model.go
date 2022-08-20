@@ -2,12 +2,14 @@ package qqe
 
 import (
 	"math"
+	"newTradingBot/api/database"
 	"newTradingBot/indicators"
 	"newTradingBot/logs"
 	"newTradingBot/models/account"
 	"newTradingBot/models/block"
 	"newTradingBot/models/strategy"
 	"newTradingBot/models/strategy/instance"
+	"newTradingBot/models/testing"
 	"newTradingBot/models/users"
 	"newTradingBot/strategies/common"
 )
@@ -69,6 +71,12 @@ func (t *qqeStrategy) HandlerFunc(marketData *block.Data)  {
 	rsi := 0.
 
 	if t.closePriceObservations[0] != 0 {
+		if t.StrategyInstance.Status == instance.StatusCreated && t.StrategyInstance.Testing == testing.Disable {
+			t.StrategyInstance.Status = instance.StatusRunning
+			db, _ := database.GetDataBaseConnection()
+			_ = instance.UpdateStatus(db, t.StrategyInstance.ID, instance.StatusRunning)
+		}
+
 		rsi = indicators.RSI(t.closePriceObservations, t.config.RSIPeriod)
 
 		// Start here
