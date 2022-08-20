@@ -1,6 +1,7 @@
 package mean_reversion
 
 import (
+	"github.com/adshao/go-binance/v2/futures"
 	"newTradingBot/api/database"
 	"newTradingBot/indicators"
 	"newTradingBot/logs"
@@ -60,6 +61,11 @@ func (t *meanReversion) HandlerFunc(marketData *block.Data)  {
 		}
 
 		mean := indicators.SimpleMA(t.closePriceObservations, len(t.closePriceObservations))
+		// handle close trade
+		if t.EvaluateExit(marketData, mean) {
+			return
+		}
+
 		sd := indicators.StandardDeviation(t.closePriceObservations)
 
 		outOfMeanUp := mean + (float64(t.config.SDMultiplier)*sd)
@@ -70,6 +76,7 @@ func (t *meanReversion) HandlerFunc(marketData *block.Data)  {
 }
 
 func (t *meanReversion) Evaluate(marketData *block.Data, down, up float64)  {
+
 	if down > marketData.ClosePrice {
 		err := t.HandleBuy(marketData)
 		if err != nil {
@@ -85,6 +92,24 @@ func (t *meanReversion) Evaluate(marketData *block.Data, down, up float64)  {
 			return
 		}
 	}
+}
+
+func (t *meanReversion) EvaluateExit(marketData *block.Data, mean float64) bool {
+	if t.LastTrade != nil {
+		if t.LastTrade.IsFutures && t.LastTrade.FuturesSide == futures.SideTypeBuy {
+			if marketData.ClosePrice > mean {
+				t.CloseAllTrades()
+				return true
+			}
+		} else if t.LastTrade.IsFutures && t.LastTrade.FuturesSide == futures.SideTypeSell {
+			if marketData.ClosePrice < mean {
+				t.CloseAllTrades()
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (t *meanReversion) ProcessData(marketData *block.Data)  {
