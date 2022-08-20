@@ -38,7 +38,7 @@ func (m *MonitorReplay) GetMonitorData() ([]*block.CapturedData, error) {
 
 	var marketData []*block.CapturedData
 
-	err = db.Where("captureid = ?", m.sessionID).Find(&marketData).Error
+	err = db.Where("captureid = ?", m.sessionID).Order("id asc").Find(&marketData).Error
 	if err != nil {
 		return nil, err
 	}

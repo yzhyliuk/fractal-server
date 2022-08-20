@@ -5,7 +5,6 @@ import (
 	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
 	"log"
-	"newTradingBot/indicators"
 	"newTradingBot/logs"
 	block2 "newTradingBot/models/block"
 	"strconv"
@@ -155,8 +154,6 @@ func (m *BinanceMonitor) RunMonitor()  {
 					block.AveragePrice = sum/float64(block.TradesCount)
 					m.mtx.Unlock()
 
-					block = m.ToHeikinAshi(block)
-
 					go m.NotifyAll(*block)
 				} else {
 					m.mtx.Unlock()
@@ -166,26 +163,6 @@ func (m *BinanceMonitor) RunMonitor()  {
 		}
 	}()
 }
-
-func (g *BinanceMonitor) ToHeikinAshi(marketData *block2.Data) *block2.Data{
-	closeP := (marketData.ClosePrice + marketData.OpenPrice + marketData.High + marketData.Low) / float64(4)
-	open := marketData.OpenPrice
-	if g.prevMarketData != nil {
-		open = (g.prevMarketData.OpenPrice+g.prevMarketData.ClosePrice)/float64(2)
-	}
-	high := indicators.Max([]float64{marketData.High, marketData.OpenPrice, marketData.ClosePrice})
-	low := indicators.Min([]float64{marketData.Low, marketData.OpenPrice, marketData.ClosePrice})
-
-	marketData.ClosePrice = closeP
-	marketData.OpenPrice = open
-	marketData.High = high
-	marketData.Low = low
-
-	g.prevMarketData = marketData
-
-	return marketData
-}
-
 
 // simple error logger
 func errHandlerLog(err error) {
