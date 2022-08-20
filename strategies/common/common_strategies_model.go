@@ -26,6 +26,8 @@ type Strategy struct {
 	TotalProfit float64
 
 	prevMarketData *block.Data
+
+	currentMarketData *block.Data
 	Stopped bool
 	HandlerFunction func(marketData *block.Data)
 	DataProcessFunction func(marketData *block.Data)
@@ -45,6 +47,8 @@ func (m *Strategy) Execute()  {
 				if m.Stopped {
 					return
 				}
+
+				m.currentMarketData = marketData
 
 				//marketData = m.ToHeikinAshi(marketData)
 
@@ -254,7 +258,7 @@ func (m *Strategy) sell(marketData *block.Data) error {
 }
 
 func (m *Strategy) closePreviousTrade()  {
-	if m.StrategyInstance.Testing != 0 {
+	if m.StrategyInstance.Testing == testing.BackTest{
 		return
 	}
 	tradeClosed, err := m.Account.CloseFuturesPosition(m.LastTrade)
@@ -283,6 +287,9 @@ func (m *Strategy) Stop()  {
 }
 
 func (m *Strategy) CloseAllTrades() {
+	if m.StrategyInstance.Testing == testing.BackTest {
+		m.TestingCloseTrade(m.currentMarketData)
+	}
 	if m.LastTrade != nil && !m.StrategyInstance.IsFutures{
 		err := m.HandleSell(nil)
 		if err != nil {
