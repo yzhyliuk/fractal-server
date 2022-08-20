@@ -1,9 +1,7 @@
 package glide_on_price
 
 import (
-	"encoding/json"
 	"fmt"
-	"log"
 	"newTradingBot/api/database"
 	"newTradingBot/logs"
 	"newTradingBot/models/account"
@@ -88,20 +86,6 @@ func (g *glideOnPrice) HandlerFunc(marketData *block.Data)  {
 
 		logs.LogDebug(fmt.Sprintf("Data processing is finished by instance #%d", g.StrategyInstance.ID), nil)
 
-		df := &FrameData{Time: time.Now(), Volatility: volatility, Slope: slope}
-		data, err := json.Marshal(df)
-		if err != nil {
-			log.Println(err.Error())
-		}
-
-		db, err := database.GetDataBaseConnection()
-		if err != nil {
-			log.Println(err.Error())
-		}
-		err = instance.NewDataFrame(db, &instance.DataFrame{InstanceID: g.StrategyInstance.ID, Data: data})
-		if err != nil {
-			log.Println(err.Error())
-		}
 	}
 }
 

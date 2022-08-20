@@ -5,6 +5,7 @@ import (
 	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
 	"newTradingBot/api/database"
+	"newTradingBot/indicators"
 	"newTradingBot/logs"
 	"newTradingBot/models/account"
 	"newTradingBot/models/block"
@@ -24,6 +25,7 @@ type Strategy struct {
 	trades []*trade.Trade
 	TotalProfit float64
 
+	prevMarketData *block.Data
 	Stopped bool
 	HandlerFunction func(marketData *block.Data)
 	DataProcessFunction func(marketData *block.Data)
@@ -44,6 +46,8 @@ func (m *Strategy) Execute()  {
 					return
 				}
 
+				//marketData = m.ToHeikinAshi(marketData)
+
 				if m.StopLossCondition() {
 					continue
 				}
@@ -59,28 +63,48 @@ func (m *Strategy) Execute()  {
 	}()
 }
 
+func (g *Strategy) ToHeikinAshi(marketData *block.Data) *block.Data{
+	closeP := (marketData.ClosePrice + marketData.OpenPrice + marketData.High + marketData.Low) / float64(4)
+	open := marketData.OpenPrice
+	if g.prevMarketData != nil {
+		open = (g.prevMarketData.OpenPrice+g.prevMarketData.ClosePrice)/float64(2)
+	}
+	high := indicators.Max([]float64{marketData.High, marketData.OpenPrice, marketData.ClosePrice})
+	low := indicators.Min([]float64{marketData.Low, marketData.OpenPrice, marketData.ClosePrice})
+
+	marketData.ClosePrice = closeP
+	marketData.OpenPrice = open
+	marketData.High = high
+	marketData.Low = low
+
+	g.prevMarketData = marketData
+
+	return marketData
+}
+
+
 func (m *Strategy) HandleTPansSL(marketData *block.Data)  {
 	// TODO : TP and SL for spot trading
 	if  m.LastTrade == nil || !m.StrategyInstance.IsFutures{
 		return
 	}
-	currentClose := marketData.ClosePrice
-	open := m.LastTrade.PriceOpen
-	unrealizedProfit := currentClose/open
-	bid := m.StrategyInstance.Bid
-	bidPure := m.StrategyInstance.Bid / float64(*m.StrategyInstance.Leverage)
+
+	price := marketData.ClosePrice
 
 	profit := 0.
 	roi := 0.
 
-	if m.LastTrade.FuturesSide == futures.SideTypeBuy {
-		profit = (bid*unrealizedProfit)-bid
-		roi = profit/bidPure
-	} else {
-		unrealizedProfit = 2 - unrealizedProfit
-		profit = (bid*unrealizedProfit)-bid
-		roi = profit/bidPure
+	switch m.LastTrade.FuturesSide {
+	case futures.SideTypeBuy:
+		profit = (m.LastTrade.Quantity*price)-m.LastTrade.USD
+	case futures.SideTypeSell:
+		profit = (m.LastTrade.Quantity*m.LastTrade.PriceOpen)-(m.LastTrade.Quantity*price)
 	}
+
+	fee := m.LastTrade.USD*trade.BinanceFuturesTakerFeeRate
+	profit -= 2*fee
+
+	roi = profit / (m.LastTrade.USD / float64(*m.LastTrade.Leverage))
 
 	if m.StrategyInstance.TradeStopLoss != 0 {
 		if roi < m.StrategyInstance.TradeStopLoss*-1 {
@@ -272,6 +296,7 @@ func (m *Strategy) CloseAllTrades() {
 func (m *Strategy) TestingBuy(marketData *block.Data, quantity float64)  {
 	newTrade := &trade.Trade{
 		Quantity: quantity,
+		IsFutures: m.StrategyInstance.IsFutures,
 		USD: m.StrategyInstance.Bid,
 		PriceOpen: marketData.ClosePrice,
 		FuturesSide: futures.SideTypeBuy,
@@ -304,6 +329,7 @@ func (m *Strategy) TestingSell(marketData *block.Data, quantity float64)  {
 		Quantity: quantity,
 		USD: m.StrategyInstance.Bid,
 		PriceOpen: marketData.ClosePrice,
+		IsFutures: m.StrategyInstance.IsFutures,
 		FuturesSide: futures.SideTypeSell,
 	}
 
