@@ -35,3 +35,4 @@ func ExponentialMA(period int, previousEMA, currentValue float64) float64  {
 	ema := currentValue*multiplier + previousEMA*(1-multiplier)
 	return ema
 }
+
