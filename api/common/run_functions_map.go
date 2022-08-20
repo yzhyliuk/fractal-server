@@ -4,6 +4,7 @@ import (
 	"newTradingBot/models/trade"
 	"newTradingBot/strategies/glide_on_price"
 	"newTradingBot/strategies/mac"
+	qqe "newTradingBot/strategies/qqe_strategy"
 	"newTradingBot/strategies/rsi_crossover"
 	"newTradingBot/strategies/simple_rsi"
 	"newTradingBot/strategies/trend_with_rsi"
@@ -16,4 +17,5 @@ var RunStrategy = map[int]func(userID int, rawConfig []byte, testing int, sessio
 	4: rsi_crossover.RunRSICrossoverStrategy,
 	//5: experimental.RunExperimentalContinuousStrategy,
 	6: simple_rsi.RunSimpleRSI,
+	7: qqe.RunQQEStrategy,
 }
