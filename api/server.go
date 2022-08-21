@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"newTradingBot/api/middleware/jwt"
+	"newTradingBot/configuration"
 )
 
 func StartServer() (*fiber.App, error) {
@@ -14,6 +15,8 @@ func StartServer() (*fiber.App, error) {
 		AllowMethods:     "GET, PATCH, PUT, POST, DELETE, OPTIONS",
 		AllowCredentials: true,
 	}))
+
+	app.Static("/static", configuration.StaticFilesDir)
 
 	app.Use(recover.New())
 

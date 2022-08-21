@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/websocket/v2"
 	"newTradingBot/api/controllers"
 )
 
@@ -32,6 +33,7 @@ func userRoutes(app *fiber.App)  {
 	usersGroup.Put("/permission", userController.UpdateUserPermission)
 	usersGroup.Get("/permission", userController.GetAllowedUsers)
 	usersGroup.Post("/permission/delete", userController.DeletePermission)
+	usersGroup.Post("/upload-photo", userController.UploadPhoto)
 }
 
 func testingRoutes(app *fiber.App) {
@@ -42,6 +44,7 @@ func testingRoutes(app *fiber.App) {
 	testingGroup.Get("/sessions", testingController.GetSessionsForUser)
 	testingGroup.Get("/delete-session", testingController.DeleteCapture)
 	testingGroup.Post("/back-test/:strategy/:session", testingController.RunBackTest)
+	testingGroup.Get("/ws", websocket.New(testingController.HandleWS))
 }
 
 func strategyRoutes(app *fiber.App)  {

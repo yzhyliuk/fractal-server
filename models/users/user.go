@@ -12,6 +12,7 @@ type User struct {
 	Username string `json:"username" gorm:"column:username"`
 	Email string `json:"email" gorm:"column:email"`
 	Password string `json:"-" gorm:"column:password"`
+	ProfilePhoto *string `json:"profilePhoto" gorm:"column:profilephoto"`
 }
 
 type NewUser struct {
@@ -53,7 +54,7 @@ func Create(db *gorm.DB, newUser *NewUser) (*User, error) {
 	}
 
 	user := &User{
-		0, newUser.Username, newUser.Email, newUser.Password,
+		0, newUser.Username, newUser.Email, newUser.Password, nil,
 	}
 
 	result := db.Create(user)
@@ -84,4 +85,8 @@ func GetUserByID(db *gorm.DB, userID int) (*User, error) {
 
 func UpdateUserName(db *gorm.DB, userID int, username string) error {
 	return db.Table(tableName).Where("id = ?", userID).Update("username", username).Error
+}
+
+func UpdateProfilePhoto(db *gorm.DB, userID int, filename string) error {
+	return db.Table(tableName).Where("id = ?", userID).Update("profilephoto", filename).Error
 }

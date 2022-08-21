@@ -3,8 +3,12 @@ package controllers
 import (
 	"encoding/json"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/websocket/v2"
 	"net/http"
 	"newTradingBot/api/common"
+	"newTradingBot/logs"
+	"newTradingBot/models/apimodels"
+	"newTradingBot/models/auth"
 	"newTradingBot/models/recording"
 	"newTradingBot/models/recording/actions"
 	"newTradingBot/models/testing"
@@ -134,6 +138,10 @@ func (t *TestingController) RunBackTest(c *fiber.Ctx) error {
 
 	profit, winRate, roi := testing.GetProfitWinRateAndRoiForTrades(trades)
 
+	if len(trades) > 200 {
+		trades = trades[:200]
+	}
+
 	return c.JSON(struct {
 		Profit float64 `json:"profit"`
 		WinRate float64 `json:"winRate"`
@@ -147,4 +155,77 @@ func (t *TestingController) RunBackTest(c *fiber.Ctx) error {
 		TradesClosed: len(trades),
 		Trades: trades,
 	})
+}
+
+func (t *TestingController) HandleWS(c *websocket.Conn) {
+	for {
+		_, msg, err := c.ReadMessage()
+		if err != nil {
+			logs.LogDebug("", err)
+			return
+		}
+
+		var BTM apimodels.BackTestModel
+
+		err = json.Unmarshal(msg, &BTM)
+		if err != nil {
+			logs.LogDebug("", err)
+			return
+		}
+
+		ui := c.Locals("userInfo")
+		userInfo := ui.(*auth.Payload)
+
+
+		rawConfig, err := json.Marshal(&BTM.Config)
+		if err != nil {
+			logs.LogDebug("", err)
+			return
+		}
+
+		trades, err := common.RunStrategy[BTM.StrategyID](userInfo.UserID, rawConfig, testing.BackTest, &BTM.CaptureID)
+		if err != nil {
+			return
+		}
+
+		profit, winRate, roi := testing.GetProfitWinRateAndRoiForTrades(trades)
+
+		if len(trades) > 200 {
+			trades = trades[:200]
+		}
+
+		res := struct {
+			Profit float64 `json:"profit"`
+			WinRate float64 `json:"winRate"`
+			Roi float64 `json:"roi"`
+			TradesClosed int `json:"tradesClosed"`
+			Trades []*trade.Trade `json:"trades"`
+		}{
+			Profit: profit,
+			WinRate: winRate,
+			Roi: roi,
+			TradesClosed: len(trades),
+			Trades: trades,
+		}
+
+
+		resp := struct {
+			Data interface{} `json:"data"`
+			Status int `json:"status"`
+		}{
+			Data: res,
+			Status: http.StatusOK,
+		}
+
+		respBytes, err := json.Marshal(&resp)
+		if err != nil {
+			return
+		}
+
+		err = c.WriteMessage(websocket.TextMessage, respBytes)
+		if err != nil {
+			logs.LogDebug("", err)
+			return
+		}
+	}
 }
