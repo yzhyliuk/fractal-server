@@ -1,8 +1,10 @@
 package controllers
 
 import (
+	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"net/http"
+	"newTradingBot/configuration"
 	"newTradingBot/models/auth"
 	"newTradingBot/models/permissions"
 	"newTradingBot/models/users"
@@ -202,6 +204,37 @@ func (u *UserController) DeletePermission(c *fiber.Ctx) error {
 	permissisonTable.OriginUser = userInfo.UserID
 
 	err = permissions.DeletePermissionTable(u.GetDB(), permissisonTable)
+	if err != nil {
+		return err
+	}
+
+	return c.SendStatus(http.StatusOK)
+}
+
+func (u *UserController) UploadPhoto(c *fiber.Ctx) error {
+	file, err := c.FormFile("file")
+	if err != nil {
+		return err
+	}
+
+	userInfo, err := u.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	user, err := users.GetUserByID(u.GetDB(), userInfo.UserID)
+	if err != nil {
+		return err
+	}
+
+	filename := fmt.Sprintf("%s-%s", user.Username, file.Filename)
+
+	err = c.SaveFile(file, fmt.Sprintf("%s/%s",configuration.StaticFilesDir, filename))
+	if err != nil {
+		return err
+	}
+
+	err = users.UpdateProfilePhoto(u.GetDB(), user.ID, filename)
 	if err != nil {
 		return err
 	}
