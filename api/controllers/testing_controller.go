@@ -189,8 +189,9 @@ func (t *TestingController) HandleWS(c *websocket.Conn) {
 		}
 
 		profit, winRate, roi := testing.GetProfitWinRateAndRoiForTrades(trades)
+		tradesClosed := len(trades)
 
-		if len(trades) > 200 {
+		if tradesClosed > 200 {
 			trades = trades[:200]
 		}
 
@@ -204,7 +205,7 @@ func (t *TestingController) HandleWS(c *websocket.Conn) {
 			Profit: profit,
 			WinRate: winRate,
 			Roi: roi,
-			TradesClosed: len(trades),
+			TradesClosed: tradesClosed,
 			Trades: trades,
 		}
 

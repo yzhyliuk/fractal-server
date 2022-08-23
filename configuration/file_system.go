@@ -1,3 +1,3 @@
 package configuration
 
-const StaticFilesDir = "./../static"
+const StaticFilesDir = "./static"
