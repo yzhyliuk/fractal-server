@@ -43,12 +43,6 @@ func CreateUserNotification(db *gorm.DB, userID int, notifyType NotifyType, mess
 }
 
 func CreateGeneralNotification(db *gorm.DB, nType NotifyType, message string) error {
-	var notification = Notification{
-		UserID: 0,
-		TimeStamp: time.Now(),
-		Message: message,
-		Type: nType,
-	}
 
 	list, err := users.ListAllUsers(db)
 	if err != nil {
@@ -56,7 +50,13 @@ func CreateGeneralNotification(db *gorm.DB, nType NotifyType, message string) er
 	}
 
 	for _, u := range list {
-		notification.UserID = u.ID
+		var notification = Notification{
+			UserID: u.ID,
+			TimeStamp: time.Now(),
+			Message: message,
+			Type: nType,
+		}
+		
 		err = db.Create(&notification).Error
 		if err != nil {
 			return err
