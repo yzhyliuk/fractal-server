@@ -22,6 +22,7 @@ type Account interface {
 	CloseFuturesPosition(tradeFutures *trade.Trade) (*trade.Trade, error)
 	PlaceRawSpotOrder(sum float64, symbol string, side binance.SideType) (*binance.CreateOrderResponse, error)
 	GetOrder(orderID int64) (*futures.Order, error)
+	GetOpenedFuturesTrades(symbol string, timeStamp time.Time) ([]*futures.PositionRisk, error)
 }
 
 type TakeProfit struct {
@@ -276,6 +277,19 @@ func (b *BinanceAccount) CloseFuturesPosition(futuresTrade *trade.Trade) (*trade
 	err = trade.CloseTrade(db, futuresTrade)
 
 	return futuresTrade, err
+}
+
+func (b *BinanceAccount) GetOpenedFuturesTrades(symbol string, timeStamp time.Time) ([]*futures.PositionRisk, error) {
+	res, err := b.futuresClient.NewGetPositionRiskService().Symbol(symbol).Do(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	return res, err
+}
+
+func (b *BinanceAccount) CloseOpenedFuturesTrade(orderID int64, symbol string) (*futures.CancelOrderResponse, error) {
+	return b.futuresClient.NewCancelOrderService().OrderID(orderID).Symbol(symbol).Do(context.Background())
 }
 
 func (b *BinanceAccount) formatQuantity(sum float64, symbol string, isFutures bool) string {

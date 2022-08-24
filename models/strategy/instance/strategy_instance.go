@@ -6,7 +6,7 @@ import (
 	"newTradingBot/models/strategy/configs"
 )
 
-const strategyInstancesTableName = "strategy_instances"
+const StrategyInstancesTableName = "strategy_instances"
 const strategyMonitoringTableName = "strategy_instance_monitoring"
 
 const StatusRunning = "running"
@@ -40,7 +40,7 @@ type StrategyMonitoring struct {
 }
 
 func (s StrategyInstance) TableName() string  {
-	return strategyInstancesTableName
+	return StrategyInstancesTableName
 }
 
 func (s StrategyMonitoring) TableName() string  {
@@ -121,7 +121,7 @@ func DeleteSelectedInstances(db *gorm.DB, ids []int, userID int) error {
 
 // UpdateStatus - updates status of running instance
 func UpdateStatus(db *gorm.DB, instanceID int, status string) error {
-	err := db.Table(strategyInstancesTableName).Where("id = ?", instanceID).Update("status",status).Error
+	err := db.Table(StrategyInstancesTableName).Where("id = ?", instanceID).Update("status",status).Error
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func UpdateStatus(db *gorm.DB, instanceID int, status string) error {
 
 func MoveInstancesToArchive(db *gorm.DB, ids []int) error {
 	for _, id := range ids {
-		err := db.Table(strategyInstancesTableName).Where("id = ?", id).Update("archived", true).Error
+		err := db.Table(StrategyInstancesTableName).Where("id = ?", id).Update("archived", true).Error
 		if err != nil {
 			return err
 		}

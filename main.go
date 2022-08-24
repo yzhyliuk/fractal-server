@@ -5,8 +5,10 @@ import (
 	"log"
 	"newTradingBot/api"
 	"newTradingBot/api/common"
+	"newTradingBot/api/database"
 	"newTradingBot/configuration"
 	"newTradingBot/logs"
+	"newTradingBot/startup_tasks"
 	"newTradingBot/storage"
 	"os"
 	"os/signal"
@@ -41,8 +43,27 @@ func main()  {
 	common.InitSpotTradingPairs()
 	common.InitFuturesTradingPairs()
 
+	db, err := database.GetDataBaseConnection()
+	if err != nil {
+		logs.LogError(err)
+		return
+	}
+
+	// stop all strategies created before
+	err = startup_tasks.StopAllStrategies(db)
+	if err != nil {
+		logs.LogError(err)
+		return
+	}
+
+	// stop all active trades
+	err = startup_tasks.CloseAllTrades(db)
+	if err != nil {
+		logs.LogError(err)
+	}
+
 	// SERVER
-	_, err := api.StartServer()
+	_, err = api.StartServer()
 	if err != nil {
 		log.Fatal(err)
 	}
