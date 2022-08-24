@@ -31,4 +31,5 @@ func establishRoutes(app *fiber.App)  {
 	userRoutes(app)
 	strategyRoutes(app)
 	testingRoutes(app)
+	notificationsRoutes(app)
 }

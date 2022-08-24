@@ -9,6 +9,7 @@ import (
 	"newTradingBot/logs"
 	"newTradingBot/models/account"
 	"newTradingBot/models/block"
+	"newTradingBot/models/notifications"
 	"newTradingBot/models/strategy/actions"
 	"newTradingBot/models/strategy/instance"
 	"newTradingBot/models/testing"
@@ -155,6 +156,11 @@ func (m *Strategy) StopLossCondition() bool {
 				logs.LogDebug("", err)
 			}
 		}()
+
+		err := notifications.CreateUserNotification(db, m.StrategyInstance.UserID,notifications.Warning,notifications.StrategyStopLoss(m.StrategyInstance.Pair,m.TotalProfit))
+		if err != nil {
+			logs.LogError(err)
+		}
 
 		return true
 	}

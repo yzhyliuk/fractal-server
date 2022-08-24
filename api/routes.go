@@ -47,6 +47,14 @@ func testingRoutes(app *fiber.App) {
 	testingGroup.Get("/ws", websocket.New(testingController.HandleWS))
 }
 
+func notificationsRoutes(app *fiber.App)  {
+	nfController := &controllers.NotificationController{}
+	nfGroup := app.Group("/notifications")
+	nfGroup.Get("", nfController.ListNotificationsForUser)
+	nfGroup.Get("/ws", websocket.New(nfController.NotificationsWS))
+	nfGroup.Get("/dismiss", nfController.DismissAll)
+}
+
 func strategyRoutes(app *fiber.App)  {
 	strategyController := &controllers.StrategyController{}
 	strategiesGroup := app.Group("/strategies")

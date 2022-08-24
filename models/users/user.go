@@ -47,6 +47,16 @@ func (n *NewUser) hashPassword() error {
 	return nil
 }
 
+func ListAllUsers(db *gorm.DB) ([]*User, error) {
+	var list []*User
+	err := db.Find(&list).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
+
 func Create(db *gorm.DB, newUser *NewUser) (*User, error) {
 	err := newUser.hashPassword()
 	if err != nil {

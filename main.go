@@ -62,6 +62,11 @@ func main()  {
 		logs.LogError(err)
 	}
 
+	err = startup_tasks.NotifyUsers()
+	if err != nil {
+		logs.LogError(err)
+	}
+
 	// SERVER
 	_, err = api.StartServer()
 	if err != nil {
