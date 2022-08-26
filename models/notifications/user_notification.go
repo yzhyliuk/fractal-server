@@ -56,7 +56,7 @@ func CreateGeneralNotification(db *gorm.DB, nType NotifyType, message string) er
 			Message: message,
 			Type: nType,
 		}
-		
+
 		err = db.Create(&notification).Error
 		if err != nil {
 			return err
