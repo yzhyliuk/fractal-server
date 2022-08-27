@@ -9,6 +9,7 @@ import (
 	"newTradingBot/models/account"
 	"newTradingBot/models/apimodels"
 	"newTradingBot/models/strategy/actions"
+	"newTradingBot/models/strategy/configs"
 	"newTradingBot/models/strategy/instance"
 	"newTradingBot/models/testing"
 	"newTradingBot/models/trade"
@@ -93,14 +94,9 @@ func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
 		return err
 	}
 
-	var config interface{}
+	var commonConfig apimodels.CommonStrategyConfig
 
-	err = c.BodyParser(&config)
-	if err != nil {
-		return err
-	}
-
-	rawConfig, err := json.Marshal(&config)
+	err = c.BodyParser(&commonConfig)
 	if err != nil {
 		return err
 	}
@@ -110,9 +106,19 @@ func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
 		return err
 	}
 
-	_, err = common.RunStrategy[strategyID](userinfo.UserID, rawConfig, testing.Disable, nil)
-	if err != nil {
-		return err
+
+	for _, pair := range commonConfig.Pairs {
+		commonConfig.Config["pair"] = pair
+
+		rawConfig, err := json.Marshal(&commonConfig.Config)
+		if err != nil {
+			return err
+		}
+
+		_, err = common.RunStrategy[strategyID](userinfo.UserID, rawConfig, testing.Disable, nil)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -252,6 +258,75 @@ func (s *StrategyController) ArchiveStrategies(c *fiber.Ctx) error {
 	}
 
 	err = instance.MoveInstancesToArchive(s.GetDB(), ids)
+	if err != nil {
+		return err
+	}
+
+	return c.SendStatus(http.StatusOK)
+}
+
+func (s *StrategyController) SaveConfig(c *fiber.Ctx) error {
+	strategyID, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return err
+	}
+
+	var config apimodels.NewStrategyConfig
+
+	err = c.BodyParser(&config)
+	if err != nil {
+		return err
+	}
+
+	rawConfig, err := json.Marshal(&config.Config)
+	if err != nil {
+		return err
+	}
+
+	userinfo, err := s.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	err = configs.CreateConfig(s.GetDB(), rawConfig, userinfo.UserID, strategyID, config.Name )
+	if err != nil {
+		return err
+	}
+
+	return c.SendStatus(http.StatusOK)
+}
+
+func (s *StrategyController) LoadConfigs(c *fiber.Ctx) error {
+	strategyID, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return err
+	}
+
+	userinfo, err := s.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	cfgs, err := configs.GetConfigsForStrategyPerUser(s.GetDB(), userinfo.UserID, strategyID)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(cfgs)
+}
+
+func (s *StrategyController) DeleteConfig(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return err
+	}
+
+	userinfo, err := s.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	err = configs.DeleteSavedConfig(s.GetDB(), id, userinfo.UserID)
 	if err != nil {
 		return err
 	}

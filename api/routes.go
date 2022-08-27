@@ -34,6 +34,7 @@ func userRoutes(app *fiber.App)  {
 	usersGroup.Get("/permission", userController.GetAllowedUsers)
 	usersGroup.Post("/permission/delete", userController.DeletePermission)
 	usersGroup.Post("/upload-photo", userController.UploadPhoto)
+	usersGroup.Get("/stats", userController.GetUserStats)
 }
 
 func testingRoutes(app *fiber.App) {
@@ -70,4 +71,7 @@ func strategyRoutes(app *fiber.App)  {
 	strategiesGroup.Get("/instances/:id/stop", strategyController.StopStrategy)
 	strategiesGroup.Post("/run-arbitrage", strategyController.RunArbitrage)
 	strategiesGroup.Post("/move-to-archive", strategyController.ArchiveStrategies)
+	strategiesGroup.Post("/config/:id", strategyController.SaveConfig)
+	strategiesGroup.Get("/config/:id", strategyController.LoadConfigs)
+	strategiesGroup.Delete("/config/:id", strategyController.DeleteConfig)
 }
