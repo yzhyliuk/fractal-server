@@ -3,6 +3,7 @@ package common
 import (
 	"newTradingBot/models/trade"
 	"newTradingBot/strategies/glide_on_price"
+	"newTradingBot/strategies/linear_regression"
 	"newTradingBot/strategies/mac"
 	"newTradingBot/strategies/mean_reversion"
 	qqe "newTradingBot/strategies/qqe_strategy"
@@ -20,4 +21,5 @@ var RunStrategy = map[int]func(userID int, rawConfig []byte, testing int, sessio
 	6: simple_rsi.RunSimpleRSI,
 	7: qqe.RunQQEStrategy,
 	8: mean_reversion.RunMeanReversion,
+	9: linear_regression.RunLinearRegression,
 }
