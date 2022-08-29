@@ -3,6 +3,7 @@ package startup_tasks
 import (
 	"gorm.io/gorm"
 	"newTradingBot/api/helpers"
+	"newTradingBot/configuration"
 	"newTradingBot/logs"
 	"newTradingBot/models/account"
 	"newTradingBot/models/strategy/instance"
@@ -12,11 +13,18 @@ import (
 )
 
 func StopAllStrategies(db *gorm.DB) error {
+	if configuration.IsDebugProd() {
+		return nil
+	}
 	return db.Table(instance.StrategyInstancesTableName).Where("status != ?", helpers.Stopped).Update("status", helpers.Stopped).Error
 }
 
 func CloseAllTrades(db *gorm.DB) error {
 	trades := make([]trade.Trade, 0)
+
+	if configuration.IsDebugProd() {
+		return nil
+	}
 
 	err := db.Where("status = ?", trade.StatusActive).Find(&trades).Error
 	if err != nil {
