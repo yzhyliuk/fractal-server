@@ -82,7 +82,7 @@ func CreateStrategyInstance(db *gorm.DB, strategyInstance *StrategyInstance) (*S
 // ListInstancesForUser - returns list of instances for given user
 func ListInstancesForUser(db *gorm.DB, userID int) ([]*StrategyMonitoring, error) {
 	var instances []*StrategyMonitoring
-	err := db.Where("user_id = ?", userID).Find(&instances).Error
+	err := db.Where("user_id = ?", userID).Order("id DESC").Find(&instances).Error
 	if err != nil {
 		return nil, err
 	}

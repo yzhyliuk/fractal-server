@@ -1,7 +1,7 @@
 package linear_regression
 
 import (
-	"fmt"
+	"github.com/adshao/go-binance/v2/futures"
 	"newTradingBot/api/database"
 	"newTradingBot/indicators"
 	"newTradingBot/logs"
@@ -10,7 +10,6 @@ import (
 	"newTradingBot/models/strategy"
 	"newTradingBot/models/strategy/instance"
 	"newTradingBot/models/testing"
-	"newTradingBot/models/trade"
 	"newTradingBot/models/users"
 	"newTradingBot/strategies/common"
 )
@@ -20,10 +19,10 @@ type linearRegression struct {
 
 	config                 LinearRegressionConfig
 	closePriceObservations []float64
-	forecastTimeFrame int
-	timeFrameCounter int
+	highPriceObservations []float64
+	lowPriceObservations []float64
 
-	prevSlopeDirectionUp bool
+	sdMultiplier float64
 }
 
 // NewLinearRegression - creates new Moving Average crossover strategy
@@ -44,10 +43,11 @@ func NewLinearRegression(monitorChannel chan *block.Data, config LinearRegressio
 	newStrategy.StrategyInstance = inst
 	newStrategy.HandlerFunction = newStrategy.HandlerFunc
 	newStrategy.DataProcessFunction = newStrategy.ProcessData
-	newStrategy.forecastTimeFrame = 10
-	newStrategy.timeFrameCounter = 0
+	newStrategy.sdMultiplier = 2
 
 	newStrategy.closePriceObservations = make([]float64, newStrategy.config.Period)
+	newStrategy.highPriceObservations = make([]float64, newStrategy.config.Period)
+	newStrategy.lowPriceObservations = make([]float64, newStrategy.config.Period)
 
 	return newStrategy, nil
 }
@@ -60,70 +60,77 @@ func (l *linearRegression) HandlerFunc(marketData *block.Data)  {
 			_ = instance.UpdateStatus(db, l.StrategyInstance.ID, instance.StatusRunning)
 		}
 
-		if l.timeFrameCounter != 0  && l.timeFrameCounter <= l.forecastTimeFrame{
-			l.timeFrameCounter++
-			return
-		} else if l.timeFrameCounter > l.forecastTimeFrame {
-			l.CloseAllTrades()
-			l.timeFrameCounter = 0
-		}
-
-		// Strategy here
-
 		slope, intercept := indicators.LinearRegressionForTimeSeries(l.closePriceObservations)
 
-		predictedPrice := intercept + (slope*(float64(l.config.Period+l.forecastTimeFrame)))
+		linearMean := intercept + slope*float64(l.config.Period)
+		regularMean := indicators.Average(l.closePriceObservations)
 
-		quantity := l.config.BidSize/marketData.ClosePrice
-		bid := l.config.BidSize/float64(*l.config.Leverage)
-		fee := l.config.BidSize*trade.BinanceFuturesTakerFeeRate
+		sdLinear := indicators.StandardDeviationWithMean(l.closePriceObservations, linearMean)
+		sdRegular := indicators.StandardDeviation(l.closePriceObservations)
 
-		tradeBuyProfit := ((predictedPrice*quantity)-(marketData.ClosePrice*quantity))-2*fee
-		tradeSellProfit := ((marketData.ClosePrice*quantity)-(predictedPrice*quantity))-2*fee
+		upperLinearLine := linearMean+(sdLinear*l.sdMultiplier)
+		lowerLinearLine := linearMean-(sdLinear*l.sdMultiplier)
 
-		tradeBuyROI := tradeBuyProfit/bid
-		tradeSellROI := tradeSellProfit/bid
-
+		upperRegularLine := regularMean+(sdRegular*l.sdMultiplier)
+		lowerRegularLine := regularMean-(sdRegular*l.sdMultiplier)
 
 
-		logs.LogDebug(fmt.Sprintf("PREDICTED PRICE: %f SLOPE: %f",predictedPrice, slope), nil)
-
-		l.Evaluate(marketData, slope, tradeBuyROI, tradeSellROI)
+		l.Evaluate(marketData, upperLinearLine, lowerLinearLine, upperRegularLine, lowerRegularLine)
 	}
 }
 
-func (l *linearRegression) Evaluate(marketData *block.Data, slope, roiBUY,roiSELL float64)  {
-	currentTrend := slope > 0
-	//trendChange := l.prevSlopeDirectionUp != currentTrend
-	l.prevSlopeDirectionUp = currentTrend
+func (l *linearRegression) Evaluate(marketData *block.Data, upLinear, lowLinear, upRegular, lowRegular float64)  {
 
-		if roiBUY > l.config.TradeTakeProfit {
-			err := l.HandleBuy(marketData)
+	targetUp := marketData.ClosePrice
+	targetDown := marketData.ClosePrice
+
+	if l.config.TargetParameter == "high" {
+		targetUp = marketData.High
+		targetDown = marketData.Low
+	}
+
+	if lowLinear > targetDown && lowRegular > targetDown{
+		err := l.HandleBuy(marketData)
+		if err != nil {
 			logs.LogError(err)
-			if err == nil {
-				l.timeFrameCounter = 1
-			}
-		} else if roiSELL > l.config.TradeTakeProfit {
-			err := l.HandleSell(marketData)
-			logs.LogError(err)
-			if err == nil {
-				l.timeFrameCounter = 1
-			}
 		}
+	} else if upLinear < targetUp && upRegular < targetUp {
+		err := l.HandleSell(marketData)
+		if err != nil {
+			logs.LogError(err)
+		}
+	}
+}
 
-	//if slope < 0 && trendChange{
-	//	err := l.HandleSell(marketData)
-	//	logs.LogError(err)
-	//} else if slope > 0 && trendChange{
-	//	err := l.HandleBuy(marketData)
-	//	logs.LogError(err)
-	//}
+func (l *linearRegression) ExitConditions(marketData *block.Data, mean float64) bool {
+	if l.LastTrade != nil {
+		conditionBuyExit := l.LastTrade.FuturesSide == futures.SideTypeBuy && marketData.ClosePrice > mean
+		conditionSellExit := l.LastTrade.FuturesSide == futures.SideTypeSell && marketData.ClosePrice < mean
+		if conditionSellExit || conditionBuyExit {
+			l.CloseAllTrades()
+			return true
+		}
+	}
 
+	return false
 }
 
 func (l *linearRegression) ProcessData(marketData *block.Data)  {
 	l.closePriceObservations = l.closePriceObservations[1:]
 	l.closePriceObservations = append(l.closePriceObservations, marketData.ClosePrice)
+
+	l.highPriceObservations = l.highPriceObservations[1:]
+	l.highPriceObservations = append(l.highPriceObservations, marketData.High)
+
+	l.lowPriceObservations = l.lowPriceObservations[1:]
+	l.lowPriceObservations = append(l.lowPriceObservations, marketData.Low)
 }
 
+func (l *linearRegression) LastLow() float64 {
+	return l.lowPriceObservations[l.config.Period-1]
+}
+
+func (l *linearRegression) LastHigh() float64 {
+	return l.highPriceObservations[l.config.Period-1]
+}
 

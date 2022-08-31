@@ -211,6 +211,20 @@ func (u *UserController) DeletePermission(c *fiber.Ctx) error {
 	return c.SendStatus(http.StatusOK)
 }
 
+func (u *UserController) GetUserInfoDashboard(c *fiber.Ctx) error {
+	userInfo, err := u.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	dashboardInfo, err := users.GetUserDashboardInfo(u.GetDB(),userInfo.UserID)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(dashboardInfo)
+}
+
 func (u *UserController) GetUserStats(c *fiber.Ctx) error {
 	userInfo, err := u.GetUserInfo(c)
 	if err != nil {
