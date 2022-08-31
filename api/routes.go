@@ -35,6 +35,7 @@ func userRoutes(app *fiber.App)  {
 	usersGroup.Post("/permission/delete", userController.DeletePermission)
 	usersGroup.Post("/upload-photo", userController.UploadPhoto)
 	usersGroup.Get("/stats", userController.GetUserStats)
+	usersGroup.Get("/dashboard-info", userController.GetUserInfoDashboard)
 }
 
 func testingRoutes(app *fiber.App) {

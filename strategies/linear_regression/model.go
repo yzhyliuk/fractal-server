@@ -1,7 +1,7 @@
 package linear_regression
 
 import (
-	"fmt"
+	"github.com/adshao/go-binance/v2/futures"
 	"newTradingBot/api/database"
 	"newTradingBot/indicators"
 	"newTradingBot/logs"
@@ -19,7 +19,10 @@ type linearRegression struct {
 
 	config                 LinearRegressionConfig
 	closePriceObservations []float64
-	forecastTimeFrame int
+	highPriceObservations []float64
+	lowPriceObservations []float64
+
+	sdMultiplier float64
 }
 
 // NewLinearRegression - creates new Moving Average crossover strategy
@@ -40,9 +43,11 @@ func NewLinearRegression(monitorChannel chan *block.Data, config LinearRegressio
 	newStrategy.StrategyInstance = inst
 	newStrategy.HandlerFunction = newStrategy.HandlerFunc
 	newStrategy.DataProcessFunction = newStrategy.ProcessData
-
+	newStrategy.sdMultiplier = 2
 
 	newStrategy.closePriceObservations = make([]float64, newStrategy.config.Period)
+	newStrategy.highPriceObservations = make([]float64, newStrategy.config.Period)
+	newStrategy.lowPriceObservations = make([]float64, newStrategy.config.Period)
 
 	return newStrategy, nil
 }
@@ -55,29 +60,77 @@ func (l *linearRegression) HandlerFunc(marketData *block.Data)  {
 			_ = instance.UpdateStatus(db, l.StrategyInstance.ID, instance.StatusRunning)
 		}
 
-		// Strategy here
+		slope, intercept := indicators.LinearRegressionForTimeSeries(l.closePriceObservations)
 
-		slope, _ := indicators.LinearRegressionForTimeSeries(l.closePriceObservations)
+		linearMean := intercept + slope*float64(l.config.Period)
+		regularMean := indicators.Average(l.closePriceObservations)
 
-		logs.LogDebug(fmt.Sprintf("SLOPE: %f", slope), nil)
+		sdLinear := indicators.StandardDeviationWithMean(l.closePriceObservations, linearMean)
+		sdRegular := indicators.StandardDeviation(l.closePriceObservations)
 
-		l.Evaluate(marketData, slope)
+		upperLinearLine := linearMean+(sdLinear*l.sdMultiplier)
+		lowerLinearLine := linearMean-(sdLinear*l.sdMultiplier)
+
+		upperRegularLine := regularMean+(sdRegular*l.sdMultiplier)
+		lowerRegularLine := regularMean-(sdRegular*l.sdMultiplier)
+
+
+		l.Evaluate(marketData, upperLinearLine, lowerLinearLine, upperRegularLine, lowerRegularLine)
 	}
 }
 
-func (l *linearRegression) Evaluate(marketData *block.Data, slope float64)  {
-	if slope < 0 {
-		err := l.HandleSell(marketData)
-		logs.LogError(err)
-	} else if slope > 0 {
-		err := l.HandleBuy(marketData)
-		logs.LogError(err)
+func (l *linearRegression) Evaluate(marketData *block.Data, upLinear, lowLinear, upRegular, lowRegular float64)  {
+
+	targetUp := marketData.ClosePrice
+	targetDown := marketData.ClosePrice
+
+	if l.config.TargetParameter == "high" {
+		targetUp = marketData.High
+		targetDown = marketData.Low
 	}
+
+	if lowLinear > targetDown && lowRegular > targetDown{
+		err := l.HandleBuy(marketData)
+		if err != nil {
+			logs.LogError(err)
+		}
+	} else if upLinear < targetUp && upRegular < targetUp {
+		err := l.HandleSell(marketData)
+		if err != nil {
+			logs.LogError(err)
+		}
+	}
+}
+
+func (l *linearRegression) ExitConditions(marketData *block.Data, mean float64) bool {
+	if l.LastTrade != nil {
+		conditionBuyExit := l.LastTrade.FuturesSide == futures.SideTypeBuy && marketData.ClosePrice > mean
+		conditionSellExit := l.LastTrade.FuturesSide == futures.SideTypeSell && marketData.ClosePrice < mean
+		if conditionSellExit || conditionBuyExit {
+			l.CloseAllTrades()
+			return true
+		}
+	}
+
+	return false
 }
 
 func (l *linearRegression) ProcessData(marketData *block.Data)  {
 	l.closePriceObservations = l.closePriceObservations[1:]
 	l.closePriceObservations = append(l.closePriceObservations, marketData.ClosePrice)
+
+	l.highPriceObservations = l.highPriceObservations[1:]
+	l.highPriceObservations = append(l.highPriceObservations, marketData.High)
+
+	l.lowPriceObservations = l.lowPriceObservations[1:]
+	l.lowPriceObservations = append(l.lowPriceObservations, marketData.Low)
 }
 
+func (l *linearRegression) LastLow() float64 {
+	return l.lowPriceObservations[l.config.Period-1]
+}
+
+func (l *linearRegression) LastHigh() float64 {
+	return l.highPriceObservations[l.config.Period-1]
+}
 
