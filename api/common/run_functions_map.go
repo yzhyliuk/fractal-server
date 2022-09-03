@@ -7,6 +7,7 @@ import (
 	"newTradingBot/strategies/mac"
 	"newTradingBot/strategies/mean_reversion"
 	qqe "newTradingBot/strategies/qqe_strategy"
+	"newTradingBot/strategies/regression_channels"
 	"newTradingBot/strategies/rsi_crossover"
 	"newTradingBot/strategies/simple_rsi"
 	"newTradingBot/strategies/trend_with_rsi"
@@ -22,4 +23,5 @@ var RunStrategy = map[int]func(userID int, rawConfig []byte, testing int, sessio
 	7: qqe.RunQQEStrategy,
 	8: mean_reversion.RunMeanReversion,
 	9: linear_regression.RunLinearRegression,
+	10: regression_channels.RunLinearRegression,
 }
