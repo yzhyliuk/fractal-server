@@ -27,9 +27,9 @@ func RunLinearRegression(userID int, rawConfig []byte, test int, sessionID *int)
 	var replayMonitor *replay.MonitorReplay
 
 	if test == testing.Disable {
-		inst, monitorChannel, keys, err = actions.PrepareStrategy(config.BaseStrategyConfig, userID, 10)
+		inst, monitorChannel, keys, err = actions.PrepareStrategy(config.BaseStrategyConfig, userID, 11)
 	} else if test == testing.BackTest{
-		inst, replayMonitor, keys, err = actions.PrepareBackTesting(config.BaseStrategyConfig, *sessionID, userID, 10)
+		inst, replayMonitor, keys, err = actions.PrepareBackTesting(config.BaseStrategyConfig, *sessionID, userID, 11)
 		monitorChannel = replayMonitor.OutputChannel
 	} else if test == testing.LiveTest {
 
