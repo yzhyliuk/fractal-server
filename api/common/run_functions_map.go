@@ -23,5 +23,5 @@ var RunStrategy = map[int]func(userID int, rawConfig []byte, testing int, sessio
 	7: qqe.RunQQEStrategy,
 	8: mean_reversion.RunMeanReversion,
 	9: linear_regression.RunLinearRegression,
-	10: regression_channels.RunLinearRegression,
+	11: regression_channels.RunLinearRegression,
 }
