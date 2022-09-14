@@ -89,6 +89,7 @@ func (s *StrategyController) GetPairs(c *fiber.Ctx) error {
 
 // RunStrategy - runs strategy with configuration from client side
 func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
+	return c.SendStatus(500)
 	strategyID, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
 		return err

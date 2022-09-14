@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"net/http"
+	"newTradingBot/api/errors"
+	"newTradingBot/api/smtp"
 	"newTradingBot/configuration"
+	"newTradingBot/models/apimodels"
 	"newTradingBot/models/auth"
 	"newTradingBot/models/permissions"
 	"newTradingBot/models/users"
+	"strconv"
 )
 
 type UserController struct {
@@ -28,6 +32,8 @@ func (u *UserController) CreateUser(c *fiber.Ctx) error {
 		return err
 	}
 
+	_ = smtp.SendVerifyEmail(*user)
+
 	token, err := auth.CreateToken(user)
 	if err != nil {
 		return err
@@ -40,7 +46,6 @@ func (u *UserController) CreateUser(c *fiber.Ctx) error {
 
 	return c.JSON(user)
 }
-
 
 // GetUser - returns user Info or 401 error TODO : Remove this test method
 func (u *UserController) GetUser(c *fiber.Ctx) error  {
@@ -265,6 +270,53 @@ func (u *UserController) UploadPhoto(c *fiber.Ctx) error {
 	err = users.UpdateProfilePhoto(u.GetDB(), user.ID, filename)
 	if err != nil {
 		return err
+	}
+
+	return c.SendStatus(http.StatusOK)
+}
+
+func (u *UserController) VerifyEmail(c *fiber.Ctx) error {
+	code := c.Query("code")
+	userID, err := strconv.Atoi(c.Query("user"))
+	if err != nil {
+		return err
+	}
+
+	err = users.ConfirmEmail(u.GetDB(), code, userID)
+	if err != nil {
+		return err
+	}
+
+	return c.SendStatus(http.StatusOK)
+}
+
+func (u *UserController) ResetPassword(c *fiber.Ctx) error{
+	var resetData apimodels.ResetPassword
+
+	err := c.BodyParser(&resetData)
+	if err != nil {
+		return c.JSON(errors.NewBadRequestError(errors.WrongData))
+	}
+
+	err = users.ResetPassword(u.GetDB(),resetData.UserID,resetData.ResetCode,resetData.NewPassword)
+	if err != nil {
+		return c.JSON(errors.NewBadRequestError(errors.ResetLinkExpired))
+	}
+
+	return c.SendStatus(http.StatusOK)
+}
+
+func (u *UserController) InitPasswordReset(c *fiber.Ctx) error {
+	email := c.Query("email")
+
+	user, err := users.InitPasswordReset(u.GetDB(), email)
+	if err != nil {
+		return c.JSON(errors.NewBadRequestError(errors.UserDoesNotExist))
+	}
+
+	err = smtp.SendResetPassword(*user)
+	if err != nil {
+		return c.JSON(errors.NewServerError(errors.ServerError))
 	}
 
 	return c.SendStatus(http.StatusOK)
