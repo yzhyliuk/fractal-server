@@ -14,6 +14,9 @@ func publicRoutes(app *fiber.App)  {
 
 	app.Get("/ping", base.Ping)
 	app.Get("/ui/:form", uiController.GetFormFields)
+	app.Get("/verify", userController.VerifyEmail)
+	app.Get("/request-reset", userController.InitPasswordReset)
+	app.Post("/reset-password", userController.ResetPassword)
 
 	app.Post("/auth", authController.Login)
 	usersGroup := app.Group("/users")
@@ -36,6 +39,7 @@ func userRoutes(app *fiber.App)  {
 	usersGroup.Post("/upload-photo", userController.UploadPhoto)
 	usersGroup.Get("/stats", userController.GetUserStats)
 	usersGroup.Get("/dashboard-info", userController.GetUserInfoDashboard)
+	usersGroup.Get("/resend-mail", userController.ResendConfirmation)
 }
 
 func testingRoutes(app *fiber.App) {

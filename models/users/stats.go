@@ -38,8 +38,9 @@ func GetUserStats(db *gorm.DB, userID int) (*UserStats, error) {
 	stats.TotalProfit = totalProfit
 	stats.TotalVolume = volume
 	stats.TotalVolumeMargin = volumeMargin
-	stats.AverageProfitPerTrade = totalProfit/float64(stats.TradesClosed)
-
+	if stats.TradesClosed != 0 {
+		stats.AverageProfitPerTrade = totalProfit/float64(stats.TradesClosed)
+	}
 	return stats, nil
 
 }

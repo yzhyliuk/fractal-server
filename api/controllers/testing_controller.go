@@ -6,6 +6,7 @@ import (
 	"github.com/gofiber/websocket/v2"
 	"net/http"
 	"newTradingBot/api/common"
+	"newTradingBot/api/errors"
 	"newTradingBot/logs"
 	"newTradingBot/models/apimodels"
 	"newTradingBot/models/auth"
@@ -53,6 +54,10 @@ func (t *TestingController) StartCapture(c *fiber.Ctx) error {
 	userInfo, err := t.GetUserInfo(c)
 	if err != nil {
 		return err
+	}
+
+	if !userInfo.Verified {
+		return c.JSON(errors.NewBadRequestError("Please confirm your email first"))
 	}
 
 	captureInstance.UserID = userInfo.UserID
