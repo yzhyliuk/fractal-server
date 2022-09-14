@@ -7,6 +7,7 @@ import (
 	"newTradingBot/api/common"
 	"newTradingBot/api/database"
 	"newTradingBot/configuration"
+	"newTradingBot/logic/runners"
 	"newTradingBot/logs"
 	"newTradingBot/startup_tasks"
 	"newTradingBot/storage"
@@ -66,6 +67,8 @@ func main()  {
 	if err != nil {
 		logs.LogError(err)
 	}
+
+	runners.LaunchRunners()
 
 	// SERVER
 	_, err = api.StartServer()

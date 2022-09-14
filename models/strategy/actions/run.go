@@ -31,7 +31,7 @@ func PrepareStrategy(conf configs.BaseStrategyConfig, userID int, strategyID int
 	monitorName := fmt.Sprintf("%s:%d:%t",conf.Pair, conf.TimeFrame, inst.IsFutures)
 
 	var monitorChannel chan *block.Data
-
+	storage.MonitorsLock.Lock()
 	if storage.MonitorsBinance[monitorName] != nil{
 		monitorChannel = storage.MonitorsBinance[monitorName].Subscribe(inst.ID)
 	} else {
@@ -40,6 +40,7 @@ func PrepareStrategy(conf configs.BaseStrategyConfig, userID int, strategyID int
 		storage.MonitorsBinance[monitorName].RunMonitor()
 		monitorChannel = storage.MonitorsBinance[monitorName].Subscribe(inst.ID)
 	}
+	storage.MonitorsLock.Unlock()
 
 	keys, err := users.GetUserKeys(db, userID)
 	if err != nil {
