@@ -287,6 +287,38 @@ func (u *UserController) VerifyEmail(c *fiber.Ctx) error {
 		return err
 	}
 
+	user, err := users.GetUserByID(u.GetDB(), userID)
+	if err != nil {
+		return err
+	}
+
+	token, err := auth.CreateToken(user)
+	if err != nil {
+		return err
+	}
+	c.Cookie(&fiber.Cookie{
+		Name:     auth.AToken,
+		Value:    *token,
+		HTTPOnly: true,
+	})
+
+
+	return c.SendStatus(http.StatusOK)
+}
+
+func (u *UserController) ResendConfirmation(c *fiber.Ctx) error {
+	userInfo, err := u.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	user, err := users.GetUserByID(u.GetDB(), userInfo.UserID)
+	if err != nil {
+		return err
+	}
+
+	_ = smtp.SendVerifyEmail(*user)
+
 	return c.SendStatus(http.StatusOK)
 }
 

@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"net/http"
 	"newTradingBot/api/common"
+	"newTradingBot/api/errors"
 	"newTradingBot/internal_arbitrage"
 	"newTradingBot/models/account"
 	"newTradingBot/models/apimodels"
@@ -106,6 +107,9 @@ func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
 		return err
 	}
 
+	if !userinfo.Verified {
+		return c.JSON(errors.NewBadRequestError("Please confirm your email first"))
+	}
 
 	for _, pair := range commonConfig.Pairs {
 		commonConfig.Config["pair"] = pair

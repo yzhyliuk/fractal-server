@@ -39,6 +39,7 @@ func userRoutes(app *fiber.App)  {
 	usersGroup.Post("/upload-photo", userController.UploadPhoto)
 	usersGroup.Get("/stats", userController.GetUserStats)
 	usersGroup.Get("/dashboard-info", userController.GetUserInfoDashboard)
+	usersGroup.Get("/resend-mail", userController.ResendConfirmation)
 }
 
 func testingRoutes(app *fiber.App) {

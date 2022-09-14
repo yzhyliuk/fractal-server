@@ -14,6 +14,7 @@ const UserInfo = "userInfo"
 
 type Payload struct {
 	UserID 			int `json:"user_id"`
+	Verified 		bool `json:"verified"`
 	Expires         time.Time `json:"exp"`
 }
 
@@ -21,6 +22,7 @@ func CreateToken(user *users.User) (*string, error) {
 	payload := Payload{
 		UserID: user.ID,
 		Expires: time.Now().Add(tokenLifeTime),
+		Verified: user.Verified,
 	}
 
 	bytes, err := json.Marshal(&payload)
