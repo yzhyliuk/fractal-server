@@ -13,7 +13,7 @@ import (
 	"newTradingBot/strategies/trend_with_rsi"
 )
 
-var RunStrategy = map[int]func(userID int, rawConfig []byte, testing int, session *int) ([]*trade.Trade, error){
+var RunStrategy = map[int]func(userID int, rawConfig []byte, testing int, session *int) ([]*trade.Trade,*int, error){
 	1: mac.RunMovingAverageCrossover,
 	2: glide_on_price.RunGlideOnPrice,
 	3: trend_with_rsi.RunTrendWithRSI,

@@ -31,7 +31,7 @@ func GetUserFinances(db *gorm.DB, userID int) (*UserFinances, error) {
 		return nil, err
 	}
 
-	lastDayTime := time.Now().Add(-time.Duration(time.Now().Hour())*time.Hour).Add(-time.Duration(time.Now().Minute())*time.Minute-24*time.Hour)
+	lastDayTime := time.Now().Add(-time.Duration(time.Now().Hour())*time.Hour).Add(-time.Duration(time.Now().Minute())*time.Minute)
 	dailyProfit, err := getDailyProfit(db,userID, &lastDayTime, nil )
 	if err != nil {
 		return nil, err
@@ -39,7 +39,7 @@ func GetUserFinances(db *gorm.DB, userID int) (*UserFinances, error) {
 
 	uFinances.DayProfit = dailyProfit
 	
-	weekDailyProfits, err := getProfit(db,userID,21)
+	weekDailyProfits, err := getProfit(db,userID,31)
 	uFinances.WeekProfit = weekDailyProfits
 
 	return uFinances, nil

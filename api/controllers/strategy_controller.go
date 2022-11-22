@@ -119,12 +119,16 @@ func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
 			return err
 		}
 
-		_, err = common.RunStrategy[strategyID](userinfo.UserID, rawConfig, testing.Disable, nil)
+		_, instanceID, err := common.RunStrategy[strategyID](userinfo.UserID, rawConfig, testing.Disable, nil)
+		if err != nil {
+			return err
+		}
+
+		err = instance.CreateConfig(*instanceID,rawConfig,s.GetDB())
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -365,4 +369,18 @@ func (s *StrategyController) RunArbitrage(c *fiber.Ctx) error  {
 	}()
 
 	return nil
+}
+
+func (s *StrategyController) GetInstanceConfig(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return err
+	}
+
+	config, err := instance.GetInstanceConfig(id, s.GetDB())
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(config)
 }

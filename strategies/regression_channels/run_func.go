@@ -12,12 +12,12 @@ import (
 	"newTradingBot/storage"
 )
 
-func RunLinearRegression(userID int, rawConfig []byte, test int, sessionID *int) ([]*trade.Trade, error) {
+func RunLinearRegression(userID int, rawConfig []byte, test int, sessionID *int) ([]*trade.Trade, *int, error) {
 	var config LinearRegressionConfig
 
 	err := json.Unmarshal(rawConfig, &config)
 	if err != nil {
-		return nil,err
+		return nil, nil, err
 	}
 
 	var inst *instance.StrategyInstance
@@ -36,31 +36,32 @@ func RunLinearRegression(userID int, rawConfig []byte, test int, sessionID *int)
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 
 	strat, err := NewLinearRegression(monitorChannel, config, keys, nil, inst)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if test == testing.Disable {
 		storage.StrategiesStorage[inst.ID] = strat
 		storage.StrategiesStorage[inst.ID].Execute()
+		return nil, &inst.ID, nil
 	} else if test == testing.BackTest {
 		strat.Execute()
 		err := replayMonitor.Start()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		trades := strat.GetTestingTrades()
 		strat.Stop()
 
-		return trades, nil
+		return trades, nil, nil
 	} else  if test == testing.LiveTest {
 
 	}
 
-	return nil, nil
+	return nil, nil, nil
 }
 
