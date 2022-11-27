@@ -15,6 +15,7 @@ import (
 	"newTradingBot/models/testing"
 	"newTradingBot/models/trade"
 	"newTradingBot/models/users"
+	"newTradingBot/storage"
 	"strconv"
 	"strings"
 )
@@ -119,12 +120,16 @@ func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
 			return err
 		}
 
-		_, err = common.RunStrategy[strategyID](userinfo.UserID, rawConfig, testing.Disable, nil)
+		_, instanceID, err := common.RunStrategy[strategyID](userinfo.UserID, rawConfig, testing.Disable, nil)
+		if err != nil {
+			return err
+		}
+
+		err = instance.CreateConfig(*instanceID,rawConfig,s.GetDB())
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -365,4 +370,33 @@ func (s *StrategyController) RunArbitrage(c *fiber.Ctx) error  {
 	}()
 
 	return nil
+}
+
+func (s *StrategyController) GetInstanceConfig(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return err
+	}
+
+	config, err := instance.GetInstanceConfig(id, s.GetDB())
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(config)
+}
+
+func (s *StrategyController) ChangeConfig(c *fiber.Ctx) error {
+	var cfg apimodels.ChangeConfig
+	err := c.BodyParser(&cfg)
+	if err != nil {
+		return err
+	}
+
+	err = storage.StrategiesStorage[cfg.InstanceID].ChangeBid(cfg.Bid)
+	if err != nil {
+		return err
+	}
+
+	return c.SendStatus(http.StatusOK)
 }

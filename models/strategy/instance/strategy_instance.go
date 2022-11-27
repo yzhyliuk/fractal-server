@@ -8,6 +8,7 @@ import (
 
 const StrategyInstancesTableName = "strategy_instances"
 const strategyMonitoringTableName = "strategy_instance_monitoring"
+const StrategyInstanceConfigTableName = "instance_config"
 
 const StatusRunning = "running"
 const StatusCreated = "created"
@@ -32,6 +33,11 @@ type StrategyInstance struct {
 	Testing int `json:"testing" gorm:"-"`
 }
 
+type StrategyInstanceConfig struct {
+	ID int `json:"instance_id" gorm:"column:instance_id"`
+	Config string `json:"config" gorm:"column:config_string"`
+}
+
 type StrategyMonitoring struct {
 	*StrategyInstance
 	Name string `json:"name" gorm:"name"`
@@ -45,7 +51,26 @@ func (s StrategyInstance) TableName() string  {
 
 func (s StrategyMonitoring) TableName() string  {
 	return strategyMonitoringTableName
+}
 
+func (s StrategyInstanceConfig) TableName() string  {
+	return StrategyInstanceConfigTableName
+}
+
+func CreateConfig(instanceID int,config []byte, db *gorm.DB) error {
+	sConf := StrategyInstanceConfig{
+		ID: instanceID,
+		Config: string(config),
+	}
+
+	return db.Create(&sConf).Error
+}
+
+func GetInstanceConfig(instanceID int, db *gorm.DB) (*StrategyInstanceConfig, error) {
+	sConf := StrategyInstanceConfig{}
+
+	err := db.Where("instance_id = ?", instanceID).Find(&sConf).Error
+	return &sConf, err
 }
 
 func GetInstanceFromConfig(conf configs.BaseStrategyConfig, userID, strategyID int) *StrategyInstance {

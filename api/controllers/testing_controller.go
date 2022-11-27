@@ -136,7 +136,7 @@ func (t *TestingController) RunBackTest(c *fiber.Ctx) error {
 		return err
 	}
 
-	trades, err := common.RunStrategy[strategy](userinfo.UserID, rawConfig, testing.BackTest, &session)
+	trades, _, err := common.RunStrategy[strategy](userinfo.UserID, rawConfig, testing.BackTest, &session)
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func (t *TestingController) HandleWS(c *websocket.Conn) {
 			return
 		}
 
-		trades, err := common.RunStrategy[BTM.StrategyID](userInfo.UserID, rawConfig, testing.BackTest, &BTM.CaptureID)
+		trades, _, err := common.RunStrategy[BTM.StrategyID](userInfo.UserID, rawConfig, testing.BackTest, &BTM.CaptureID)
 		if err != nil {
 			return
 		}
