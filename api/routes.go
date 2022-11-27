@@ -80,4 +80,5 @@ func strategyRoutes(app *fiber.App)  {
 	strategiesGroup.Get("/config/:id", strategyController.LoadConfigs)
 	strategiesGroup.Delete("/config/:id", strategyController.DeleteConfig)
 	strategiesGroup.Get("/instances/config/:id", strategyController.GetInstanceConfig)
+	strategiesGroup.Post("/instances/config/change", strategyController.ChangeConfig)
 }

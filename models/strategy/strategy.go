@@ -14,6 +14,7 @@ type Strategy interface {
 	Stop()
 	ExecuteExperimental()
 	GetTestingTrades() []*trade.Trade
+	ChangeBid(bid float64) error
 }
 
 type HandlerFunc func(block *block.Data, orderSpot *binance.CreateOrderResponse, orderFutures *futures.CreateOrderResponse, err error)

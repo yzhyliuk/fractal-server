@@ -15,6 +15,7 @@ import (
 	"newTradingBot/models/testing"
 	"newTradingBot/models/trade"
 	"newTradingBot/models/users"
+	"newTradingBot/storage"
 	"strconv"
 	"strings"
 )
@@ -383,4 +384,19 @@ func (s *StrategyController) GetInstanceConfig(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(config)
+}
+
+func (s *StrategyController) ChangeConfig(c *fiber.Ctx) error {
+	var cfg apimodels.ChangeConfig
+	err := c.BodyParser(&cfg)
+	if err != nil {
+		return err
+	}
+
+	err = storage.StrategiesStorage[cfg.InstanceID].ChangeBid(cfg.Bid)
+	if err != nil {
+		return err
+	}
+
+	return c.SendStatus(http.StatusOK)
 }

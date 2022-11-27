@@ -38,6 +38,7 @@ type Strategy struct {
 func (m *Strategy) Execute()  {
 	m.TotalProfit = 0
 	m.trades = make([]*trade.Trade, 0)
+
 	go func() {
 		for  {
 			select {
@@ -66,6 +67,16 @@ func (m *Strategy) Execute()  {
 			}
 		}
 	}()
+}
+
+func (q *Strategy) ChangeBid(bid float64) error {
+	q.StrategyInstance.Bid = bid
+	db, err := database.GetDataBaseConnection()
+	if err != nil {
+		return err
+	}
+
+	return db.Save(q.StrategyInstance).Error
 }
 
 func (g *Strategy) ToHeikinAshi(marketData *block.Data) *block.Data{
