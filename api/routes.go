@@ -49,7 +49,6 @@ func testingRoutes(app *fiber.App) {
 	testingGroup.Get("/stop-capture", testingController.StopCapture)
 	testingGroup.Get("/sessions", testingController.GetSessionsForUser)
 	testingGroup.Get("/delete-session", testingController.DeleteCapture)
-	testingGroup.Post("/back-test/:strategy/:session", testingController.RunBackTest)
 	testingGroup.Get("/ws", websocket.New(testingController.HandleWS))
 }
 

@@ -1,6 +1,7 @@
 package simple_rsi
 
 import (
+	"encoding/json"
 	"fmt"
 	"newTradingBot/api/database"
 	"newTradingBot/indicators"
@@ -13,6 +14,8 @@ import (
 	"newTradingBot/strategies/common"
 )
 
+const StrategyName = "simple_rsi"
+
 type SimpleRSI struct {
 	common.Strategy
 
@@ -23,7 +26,14 @@ type SimpleRSI struct {
 }
 
 // NewSimpleRSI - creates new Moving Average crossover strategy
-func NewSimpleRSI(monitorChannel chan *block.Data, config SimpleRSIConfig, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+func NewSimpleRSI(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+
+	var config SimpleRSIConfig
+
+	err := json.Unmarshal(configRaw, &config)
+	if err != nil {
+		return nil,err
+	}
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {

@@ -1,6 +1,7 @@
 package mean_reversion
 
 import (
+	"encoding/json"
 	"github.com/adshao/go-binance/v2/futures"
 	"newTradingBot/api/database"
 	"newTradingBot/indicators"
@@ -14,6 +15,8 @@ import (
 	"newTradingBot/strategies/common"
 )
 
+const StrategyName = "mean_reversion"
+
 type meanReversion struct {
 	common.Strategy
 
@@ -24,7 +27,14 @@ type meanReversion struct {
 }
 
 // NewMeanReversion - creates new Moving Average crossover strategy
-func NewMeanReversion(monitorChannel chan *block.Data, config MeanReversionConfig, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+func NewMeanReversion(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+
+	var config MeanReversionConfig
+
+	err := json.Unmarshal(configRaw, &config)
+	if err != nil {
+		return nil,err
+	}
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {

@@ -1,6 +1,7 @@
 package rsi_crossover
 
 import (
+	"encoding/json"
 	"fmt"
 	"newTradingBot/api/database"
 	"newTradingBot/indicators"
@@ -24,8 +25,16 @@ type rsiCrossover struct {
 	config RSICrossoverConfig
 }
 
+const StrategyName = "rsi_crossover"
+
 // NewRSICrossoverStrategy - creates new RSI crossover strategy
-func NewRSICrossoverStrategy(monitorChannel chan *block.Data, config RSICrossoverConfig, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+func NewRSICrossoverStrategy(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+	var config RSICrossoverConfig
+
+	err := json.Unmarshal(configRaw, &config)
+	if err != nil {
+		return nil,err
+	}
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {

@@ -1,6 +1,7 @@
 package trend_with_rsi
 
 import (
+	"encoding/json"
 	"fmt"
 	"newTradingBot/api/database"
 	"newTradingBot/indicators"
@@ -24,6 +25,8 @@ type trendWithRSIStrategy struct {
 	orderUptrend bool
 }
 
+const StrategyName = "trend_with_rsi"
+
 type dataToStore struct {
 	Sum float64
 	Count int
@@ -34,7 +37,13 @@ type FrameData struct {
 }
 
 // NewTrendFollowWithRSIStrategy - creates new Moving Average crossover strategy
-func NewTrendFollowWithRSIStrategy(monitorChannel chan *block.Data, config TrendWithRSIConfig, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+func NewTrendFollowWithRSIStrategy(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+	var config TrendWithRSIConfig
+
+	err := json.Unmarshal(configRaw, &config)
+	if err != nil {
+		return nil,err
+	}
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {

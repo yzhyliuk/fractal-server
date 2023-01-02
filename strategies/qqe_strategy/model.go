@@ -1,6 +1,7 @@
 package qqe
 
 import (
+	"encoding/json"
 	"math"
 	"newTradingBot/api/database"
 	"newTradingBot/indicators"
@@ -13,6 +14,8 @@ import (
 	"newTradingBot/models/users"
 	"newTradingBot/strategies/common"
 )
+
+const StrategyName = "qqe"
 
 type qqeStrategy struct {
 	common.Strategy
@@ -42,7 +45,13 @@ type qqeStrategy struct {
 }
 
 // NewQQEStrategy - creates new Moving Average crossover strategy
-func NewQQEStrategy(monitorChannel chan *block.Data, config QQEStrategyConfig, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+func NewQQEStrategy(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+	var config QQEStrategyConfig
+
+	err := json.Unmarshal(configRaw, &config)
+	if err != nil {
+		return nil,err
+	}
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {

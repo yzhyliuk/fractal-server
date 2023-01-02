@@ -12,3 +12,8 @@ type BaseStrategyConfig struct {
 	TradeStopLoss float64 `json:"tradeStopLoss"`
 }
 
+type GenericConfig struct {
+	BaseStrategyConfig
+	otherConfig interface{}
+}
+

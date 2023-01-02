@@ -108,60 +108,6 @@ func (t *TestingController) DeleteCapture(c *fiber.Ctx) error {
 	return c.SendStatus(http.StatusOK)
 }
 
-func (t *TestingController) RunBackTest(c *fiber.Ctx) error {
-	strategy, err := strconv.Atoi(c.Params("strategy"))
-	if err != nil {
-		return err
-	}
-
-	session, err := strconv.Atoi(c.Params("session"))
-	if err != nil {
-		return err
-	}
-
-	var config interface{}
-
-	err = c.BodyParser(&config)
-	if err != nil {
-		return err
-	}
-
-	rawConfig, err := json.Marshal(&config)
-	if err != nil {
-		return err
-	}
-
-	userinfo, err := t.GetUserInfo(c)
-	if err != nil {
-		return err
-	}
-
-	trades, _, err := common.RunStrategy[strategy](userinfo.UserID, rawConfig, testing.BackTest, &session)
-	if err != nil {
-		return err
-	}
-
-	profit, winRate, roi := testing.GetProfitWinRateAndRoiForTrades(trades)
-
-	if len(trades) > 200 {
-		trades = trades[:200]
-	}
-
-	return c.JSON(struct {
-		Profit float64 `json:"profit"`
-		WinRate float64 `json:"winRate"`
-		Roi float64 `json:"roi"`
-		TradesClosed int `json:"tradesClosed"`
-		Trades []*trade.Trade `json:"trades"`
-	}{
-		Profit: profit,
-		WinRate: winRate,
-		Roi: roi,
-		TradesClosed: len(trades),
-		Trades: trades,
-	})
-}
-
 func (t *TestingController) HandleWS(c *websocket.Conn) {
 	for {
 		_, msg, err := c.ReadMessage()
@@ -188,7 +134,14 @@ func (t *TestingController) HandleWS(c *websocket.Conn) {
 			return
 		}
 
-		trades, _, err := common.RunStrategy[BTM.StrategyID](userInfo.UserID, rawConfig, testing.BackTest, &BTM.CaptureID)
+		//TODO: separate method for this db request
+		var sInfo apimodels.StrategyInfo
+		err = t.GetDB().Where("id = ?",BTM.StrategyID).Find(&sInfo).Error
+		if err != nil {
+			return
+		}
+
+		trades, _, err := common.RunFunction(userInfo.UserID, rawConfig, testing.BackTest,BTM.StrategyID,sInfo.StrategyName, &BTM.CaptureID)
 		if err != nil {
 			return
 		}

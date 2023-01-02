@@ -1,6 +1,7 @@
 package mac
 
 import (
+	"encoding/json"
 	"fmt"
 	"newTradingBot/api/database"
 	"newTradingBot/indicators"
@@ -41,9 +42,18 @@ type FrameData struct {
 	ShortTerm float64 `json:"shortTerm"`
 }
 
+const StrategyName = "mac"
+
 
 // NewMacStrategy - creates new Moving Average crossover strategy
-func NewMacStrategy(monitorChannel chan *block.Data, config MovingAverageCrossoverConfig, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+func NewMacStrategy(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+
+	var config MovingAverageCrossoverConfig
+
+	err := json.Unmarshal(configRaw, &config)
+	if err != nil {
+		return nil,err
+	}
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {
