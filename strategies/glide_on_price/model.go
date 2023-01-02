@@ -1,6 +1,7 @@
 package glide_on_price
 
 import (
+	"encoding/json"
 	"fmt"
 	"newTradingBot/api/database"
 	"newTradingBot/logs"
@@ -12,6 +13,8 @@ import (
 	"newTradingBot/strategies/common"
 	"time"
 )
+
+const StrategyName = "glide_on_price"
 
 type glideOnPrice struct {
 	common.Strategy
@@ -28,7 +31,14 @@ type FrameData struct {
 }
 
 // NewGlideOnPriceStrategy - creates new Moving Average crossover strategy
-func NewGlideOnPriceStrategy(monitorChannel chan *block.Data, config GlideOnPriceConfig, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+func NewGlideOnPriceStrategy(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+
+	var config GlideOnPriceConfig
+
+	err := json.Unmarshal(configRaw, &config)
+	if err != nil {
+		return nil,err
+	}
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {

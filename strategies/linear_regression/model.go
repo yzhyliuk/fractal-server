@@ -1,6 +1,7 @@
 package linear_regression
 
 import (
+	"encoding/json"
 	"github.com/adshao/go-binance/v2/futures"
 	"newTradingBot/api/database"
 	"newTradingBot/indicators"
@@ -14,6 +15,8 @@ import (
 	"newTradingBot/strategies/common"
 )
 
+const StrategyName = "linear_regression"
+
 type linearRegression struct {
 	common.Strategy
 
@@ -26,7 +29,14 @@ type linearRegression struct {
 }
 
 // NewLinearRegression - creates new Moving Average crossover strategy
-func NewLinearRegression(monitorChannel chan *block.Data, config LinearRegressionConfig, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+func NewLinearRegression(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+
+	var config LinearRegressionConfig
+
+	err := json.Unmarshal(configRaw, &config)
+	if err != nil {
+		return nil,err
+	}
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {

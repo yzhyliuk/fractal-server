@@ -9,7 +9,9 @@ type StrategyInfo struct {
 	Name string `json:"name" gorm:"column:"`
 	Description string `json:"description" gorm:"column:description"`
 	IsContinuous bool `json:"isContinuous" gorm:"column:is_continuous"`
+	IsHidden bool `json:"isHidden" gorm:"column:is_hidden"`
 	Disabled bool `json:"disabled" gorm:"column:disabled"`
+	StrategyName string `json:"strategy_name" gorm:"column:strategy_name"`
 }
 
 func (s *StrategyInfo) TableName() string  {

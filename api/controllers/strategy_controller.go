@@ -96,6 +96,13 @@ func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
 		return err
 	}
 
+	//TODO: separate method for this db request
+	var sInfo apimodels.StrategyInfo
+	err = s.GetDB().Where("id = ?", strategyID).Find(&sInfo).Error
+	if err != nil {
+		return err
+	}
+
 	var commonConfig apimodels.CommonStrategyConfig
 
 	err = c.BodyParser(&commonConfig)
@@ -120,7 +127,7 @@ func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
 			return err
 		}
 
-		_, instanceID, err := common.RunStrategy[strategyID](userinfo.UserID, rawConfig, testing.Disable, nil)
+		_, instanceID, err := common.RunFunction(userinfo.UserID, rawConfig, testing.Disable, strategyID, sInfo.StrategyName, nil)
 		if err != nil {
 			return err
 		}
