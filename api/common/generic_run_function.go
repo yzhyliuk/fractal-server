@@ -12,6 +12,7 @@ import (
 	"newTradingBot/models/trade"
 	"newTradingBot/models/users"
 	"newTradingBot/storage"
+	"newTradingBot/strategies/bollinger_bands_with_atr"
 	"newTradingBot/strategies/glide_on_price"
 	"newTradingBot/strategies/linear_regression"
 	"newTradingBot/strategies/mac"
@@ -33,6 +34,7 @@ var NewStrategy = map[string]func(monitorChannel chan *block.Data, configRaw []b
 	regression_channels.StrategyName: regression_channels.NewLinearRegression,
 	rsi_crossover.StrategyName: rsi_crossover.NewRSICrossoverStrategy,
 	trend_with_rsi.StrategyName: trend_with_rsi.NewTrendFollowWithRSIStrategy,
+	bollinger_bands_with_atr.StrategyName: bollinger_bands_with_atr.NewBollingerBandsWithATR,
 }
 
 
