@@ -3,7 +3,7 @@ module newTradingBot
 go 1.17
 
 require (
-	github.com/adshao/go-binance/v2 v2.3.9
+	github.com/adshao/go-binance/v2 v2.4.1
 	github.com/gofiber/fiber/v2 v2.38.1
 	github.com/gofiber/websocket/v2 v2.1.0
 	github.com/lib/pq v1.10.7
