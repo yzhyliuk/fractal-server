@@ -23,6 +23,8 @@ type BollingerBandsWithATR struct {
 
 	orderTargetPrice float64
 	orderStopLossPrice float64
+
+	observationsLength int
 }
 
 const StrategyName = "bollinger_bands_with_atr"
@@ -47,6 +49,7 @@ func NewBollingerBandsWithATR(monitorChannel chan *block.Data, configRaw []byte,
 
 	newStrategy := &BollingerBandsWithATR{
 		config: config,
+		observationsLength: observationsLength,
 	}
 	newStrategy.Account = acc
 	newStrategy.StopSignal = make(chan bool)
@@ -64,29 +67,34 @@ func NewBollingerBandsWithATR(monitorChannel chan *block.Data, configRaw []byte,
 
 func (m *BollingerBandsWithATR) HandlerFunc(marketData *block.Data)  {
 
-	longTermMA := indicators.SimpleMA(m.closePrice,m.config.MALength)
-	shortTermMA := indicators.SimpleMA(m.closePrice,m.config.MALength/2)
+	//slope := m.closePrice[m.observationsLength-1]/m.closePrice[m.observationsLength-2]
+
+	//longTermMA := indicators.SimpleMA(m.closePrice,m.config.MALength)
+	//shortTermMA := indicators.SimpleMA(m.closePrice,m.config.MALength/2)
 
 	upperBB, lowerBB := indicators.BollingerBands(m.closePrice, m.config.BBLength, m.config.BBMultiplier)
 
 	atr := indicators.AverageTrueRange(m.highPrice, m.lowPrice, m.closePrice, m.config.ATRLength)
 
-	if (shortTermMA > longTermMA) && (marketData.ClosePrice < upperBB) && (atr[m.config.ATRLength] > atr[m.config.ATRLength-1]) {
-		// Buy
-		err := m.HandleBuy(marketData)
+	//if atr[m.observationsLength-1] < atr[m.observationsLength-2] {
+	//	m.CloseAllTrades()
+	//}
+
+	if (marketData.High > upperBB) && (atr[m.observationsLength-1] > atr[m.observationsLength-2]) {
+		// Sell
+		err := m.HandleSell(marketData)
 		if err != nil {
 			logs.LogError(err)
 		}
 		return
 	}
 
-	if (shortTermMA < longTermMA) && (marketData.ClosePrice > lowerBB) && (atr[m.config.ATRLength] > atr[m.config.ATRLength-1]) {
+	if (marketData.Low < lowerBB) && (atr[m.observationsLength-1] > atr[m.observationsLength-2]) {
 		//Sell
-		err := m.HandleSell(marketData)
+		err := m.HandleBuy(marketData)
 		if err != nil {
 			logs.LogError(err)
 		}
-
 		return
 	}
 }

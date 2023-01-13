@@ -16,6 +16,7 @@ import (
 	"newTradingBot/models/trade"
 	"newTradingBot/models/users"
 	"newTradingBot/storage"
+	"newTradingBot/strategies/experimental"
 	"strconv"
 	"strings"
 )
@@ -125,6 +126,14 @@ func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
 		rawConfig, err := json.Marshal(&commonConfig.Config)
 		if err != nil {
 			return err
+		}
+
+		if sInfo.IsContinuous {
+			err = experimental.RunExperimentalContinuousStrategy(userinfo.UserID,rawConfig,0, nil)
+			if err != nil {
+				return err
+			}
+			return c.SendStatus(200)
 		}
 
 		_, instanceID, err := common.RunFunction(userinfo.UserID, rawConfig, testing.Disable, strategyID, sInfo.StrategyName, nil)

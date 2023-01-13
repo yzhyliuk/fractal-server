@@ -23,6 +23,7 @@ type Account interface {
 	PlaceRawSpotOrder(sum float64, symbol string, side binance.SideType) (*binance.CreateOrderResponse, error)
 	GetOrder(orderID int64) (*futures.Order, error)
 	GetOpenedFuturesTrades(symbol string, timeStamp time.Time) ([]*futures.PositionRisk, error)
+	GetCurrentQuote(symbol string) (float64, error)
 }
 
 type TakeProfit struct {
@@ -72,6 +73,17 @@ func NewBinanceAccount(apiKey, secretKey, futuresApiKey, futuresSecretKey string
 	}
 
 	return nba, nil
+}
+
+func (b *BinanceAccount) GetCurrentQuote(symbol string) (float64, error)  {
+	v, err := b.futuresClient.NewListPricesService().Symbol(symbol).Do(context.Background())
+	if err != nil {
+		return 0, err
+	}
+
+	price, _ := strconv.ParseFloat(v[0].Price, 64)
+
+	return price, nil
 }
 
 func (b *BinanceAccount) GetOrder(orderID int64) (*futures.Order, error) {
