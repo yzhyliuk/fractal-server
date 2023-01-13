@@ -67,31 +67,34 @@ func NewBollingerBandsWithATR(monitorChannel chan *block.Data, configRaw []byte,
 
 func (m *BollingerBandsWithATR) HandlerFunc(marketData *block.Data)  {
 
-	//slope := m.closePrice[m.observationsLength]/m.closePrice[m.observationsLength-1]
+	//slope := m.closePrice[m.observationsLength-1]/m.closePrice[m.observationsLength-2]
 
-	longTermMA := indicators.SimpleMA(m.closePrice,m.config.MALength)
-	shortTermMA := indicators.SimpleMA(m.closePrice,m.config.MALength/2)
+	//longTermMA := indicators.SimpleMA(m.closePrice,m.config.MALength)
+	//shortTermMA := indicators.SimpleMA(m.closePrice,m.config.MALength/2)
 
 	upperBB, lowerBB := indicators.BollingerBands(m.closePrice, m.config.BBLength, m.config.BBMultiplier)
 
 	atr := indicators.AverageTrueRange(m.highPrice, m.lowPrice, m.closePrice, m.config.ATRLength)
 
-	if (shortTermMA > longTermMA) && (marketData.ClosePrice < upperBB) && (atr[m.observationsLength] > atr[m.observationsLength-1]) {
-		// Buy
-		err := m.HandleBuy(marketData)
+	//if atr[m.observationsLength-1] < atr[m.observationsLength-2] {
+	//	m.CloseAllTrades()
+	//}
+
+	if (marketData.High > upperBB) && (atr[m.observationsLength-1] > atr[m.observationsLength-2]) {
+		// Sell
+		err := m.HandleSell(marketData)
 		if err != nil {
 			logs.LogError(err)
 		}
 		return
 	}
 
-	if (shortTermMA < longTermMA) && (marketData.ClosePrice > lowerBB) && (atr[m.observationsLength] > atr[m.observationsLength-1]) {
+	if (marketData.Low < lowerBB) && (atr[m.observationsLength-1] > atr[m.observationsLength-2]) {
 		//Sell
-		err := m.HandleSell(marketData)
+		err := m.HandleBuy(marketData)
 		if err != nil {
 			logs.LogError(err)
 		}
-
 		return
 	}
 }

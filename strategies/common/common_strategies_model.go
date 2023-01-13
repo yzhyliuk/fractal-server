@@ -14,7 +14,12 @@ import (
 	"newTradingBot/models/strategy/instance"
 	"newTradingBot/models/testing"
 	"newTradingBot/models/trade"
+	"strconv"
+	"time"
 )
+
+const maxPriceDefault = 0.
+const lowPriceDefault = 9999999999.
 
 type Strategy struct {
 	StrategyInstance *instance.StrategyInstance
@@ -33,11 +38,18 @@ type Strategy struct {
 	HandlerFunction func(marketData *block.Data)
 	DataProcessFunction func(marketData *block.Data)
 	ExperimentalHandler func()
+
+	TakeProfitPrice float64
+	StopLossPrice float64
 }
 
 func (m *Strategy) Execute()  {
 	m.TotalProfit = 0
 	m.trades = make([]*trade.Trade, 0)
+
+	if m.StrategyInstance.Testing != testing.BackTest {
+		m.LivePriceMonitoring()
+	}
 
 	go func() {
 		for  {
@@ -227,6 +239,8 @@ func (m *Strategy) buy(marketData *block.Data) error {
 			return err
 		}
 
+		m.StopLossPrice = m.CalculateStopLossPrice(futuresTrade.PriceOpen, true)
+
 		m.LastTrade = futuresTrade
 	} else {
 		spotTrade, err := m.Account.PlaceMarketOrder(quantity, m.StrategyInstance.Pair,binance.SideTypeBuy, m.StrategyInstance, m.LastTrade)
@@ -258,6 +272,8 @@ func (m *Strategy) sell(marketData *block.Data) error {
 		if err != nil {
 			return err
 		}
+
+		m.StopLossPrice = m.CalculateStopLossPrice(futuresTrade.PriceOpen, true)
 
 		m.LastTrade = futuresTrade
 	} else {
@@ -383,4 +399,84 @@ func (m *Strategy) TestingCloseTrade(marketData *block.Data)  {
 		m.trades = append(m.trades, closedTrade)
 		m.LastTrade = nil
 	}
+}
+
+func (m *Strategy) CalculateStopLossPrice(priceCurrent float64, sell bool) float64 {
+	sl := m.StrategyInstance.TradeStopLoss
+	if sl == 0 {
+		return 0
+	}
+
+	priceDelta :=  priceCurrent*(sl/float64(*m.StrategyInstance.Leverage))
+
+	if sell {
+		return priceCurrent + priceDelta
+	} else {
+		return priceCurrent - priceDelta
+	}
+}
+
+func (m *Strategy) LivePriceMonitoring() {
+	go func() {
+		for{
+			if m.Stopped {
+				break
+			} else if m.LastTrade == nil {
+				time.Sleep(10*time.Second)
+				continue
+			}
+
+			lowPrice := lowPriceDefault
+			highPrice := maxPriceDefault
+
+			wsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
+				price, _ := strconv.ParseFloat(event.Price, 64)
+				if price < lowPrice {
+					lowPrice = price
+				}
+				if price > highPrice {
+					highPrice = price
+				}
+			}
+
+			_, stopC, _ := futures.WsAggTradeServe(m.StrategyInstance.Pair, wsAggTradeHandler, nil)
+
+			time.Sleep(time.Second*5)
+
+			stopC <- struct{}{}
+
+			shouldClose := false
+
+			if m.LastTrade != nil && (lowPrice != lowPriceDefault || highPrice != maxPriceDefault){
+				if m.StopLossPrice != 0 {
+					switch m.LastTrade.FuturesSide {
+					case futures.SideTypeSell:
+						if highPrice > m.StopLossPrice {
+							shouldClose = true
+						}
+					case futures.SideTypeBuy:
+						if lowPrice < m.StopLossPrice {
+							shouldClose = true
+						}
+					}
+				}
+				if m.TakeProfitPrice != 0 {
+					switch m.LastTrade.FuturesSide {
+					case futures.SideTypeSell:
+						if lowPrice < m.TakeProfitPrice {
+							shouldClose = true
+						}
+					case futures.SideTypeBuy:
+						if highPrice > m.TakeProfitPrice {
+							shouldClose = true
+						}
+					}
+				}
+			}
+
+			if shouldClose {
+				m.CloseAllTrades()
+			}
+		}
+	}()
 }

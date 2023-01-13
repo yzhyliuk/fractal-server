@@ -7,7 +7,6 @@ import (
 	"newTradingBot/indicators"
 	"newTradingBot/logs"
 	"newTradingBot/models/account"
-	"newTradingBot/models/block"
 	"newTradingBot/models/strategy"
 	"newTradingBot/models/strategy/instance"
 	"newTradingBot/models/users"
@@ -39,7 +38,7 @@ func NewContinuousExperimentalStrategy(config continuousConfig, keys *users.Keys
 	newStrategy.StrategyInstance = inst
 	newStrategy.ExperimentalHandler = newStrategy.Start
 
-	newStrategy.priceObservations = make([]float64, 500)
+	newStrategy.priceObservations = make([]float64, 400)
 
 	return newStrategy, nil
 }
@@ -53,43 +52,45 @@ func (e *experimentalContinuousStrategy) Start()  {
 
 	wsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
 		price, _ := strconv.ParseFloat(event.Price, 64)
-		quantity, _ := strconv.ParseFloat(event.Quantity, 64)
+		//quantity, _ := strconv.ParseFloat(event.Quantity, 64)
 
 		e.priceObservations = e.priceObservations[1:]
 		e.priceObservations = append(e.priceObservations, price)
 
 		if e.priceObservations[0] != 0 {
-			sd := indicators.StandardDeviation(e.priceObservations)
-			mean := indicators.SimpleMA(e.priceObservations, len(e.priceObservations))
-
-			if e.LastTrade != nil && e.LastTrade.FuturesSide == futures.SideTypeBuy{
-				if price > mean {
-					e.CloseAllTrades()
-				}
-			}
-
-			if e.LastTrade != nil && e.LastTrade.FuturesSide == futures.SideTypeSell{
-				if price < mean {
-					e.CloseAllTrades()
-				}
-			}
-
-			if price < mean-(sd*3) {
-				err := e.HandleBuy(&block.Data{
-					ClosePrice: price,
-				})
-				if err != nil {
-					logs.LogDebug("", err)
-				}
-			} else if price > mean+(sd*3) {
-				err := e.HandleSell(&block.Data{
-					ClosePrice: price,
-				})
-				if err != nil {
-					logs.LogDebug("", err)
-				}
-			}
-			logs.LogDebug(fmt.Sprintf("\nPRICE: %f \t QUANTITY: %f \n SD: %f \t MEAN: %f", price, quantity, sd, mean ),nil)
+			slope, _ := indicators.LinearRegressionForTimeSeries(e.priceObservations)
+			logs.LogDebug(fmt.Sprintf("SL: %f \t PRICE: %f", slope, price),nil)
+			//sd := indicators.StandardDeviation(e.priceObservations)
+			//mean := indicators.SimpleMA(e.priceObservations, len(e.priceObservations))
+			//
+			//if e.LastTrade != nil && e.LastTrade.FuturesSide == futures.SideTypeBuy{
+			//	if price > mean {
+			//		e.CloseAllTrades()
+			//	}
+			//}
+			//
+			//if e.LastTrade != nil && e.LastTrade.FuturesSide == futures.SideTypeSell{
+			//	if price < mean {
+			//		e.CloseAllTrades()
+			//	}
+			//}
+			//
+			//if price < mean-(sd*3) {
+			//	err := e.HandleBuy(&block.Data{
+			//		ClosePrice: price,
+			//	})
+			//	if err != nil {
+			//		logs.LogDebug("", err)
+			//	}
+			//} else if price > mean+(sd*3) {
+			//	err := e.HandleSell(&block.Data{
+			//		ClosePrice: price,
+			//	})
+			//	if err != nil {
+			//		logs.LogDebug("", err)
+			//	}
+			//}
+	//		//logs.LogDebug(fmt.Sprintf("\nPRICE: %f \t QUANTITY: %f \n SD: %f \t MEAN: %f", price, quantity, sd, mean ),nil)
 		}
 	}
 

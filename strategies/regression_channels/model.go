@@ -87,11 +87,11 @@ func (l *linearRegression) HandlerFunc(marketData *block.Data)  {
 		lowerRegularLine := regularMean-(sdRegular*l.sdMultiplier)
 
 
-		l.Evaluate(marketData, upperLinearLine, lowerLinearLine, upperRegularLine, lowerRegularLine)
+		l.Evaluate(marketData, upperLinearLine, lowerLinearLine, linearMean, upperRegularLine, lowerRegularLine)
 	}
 }
 
-func (l *linearRegression) Evaluate(marketData *block.Data, upLinear, lowLinear, upRegular, lowRegular float64)  {
+func (l *linearRegression) Evaluate(marketData *block.Data, upLinear, lowLinear, linearMean, upRegular, lowRegular float64)  {
 
 	targetUp := marketData.ClosePrice
 	targetDown := marketData.ClosePrice
@@ -105,36 +105,74 @@ func (l *linearRegression) Evaluate(marketData *block.Data, upLinear, lowLinear,
 	if l.LastTrade != nil {
 		exitTargetUp := marketData.High
 		exitTargetDown := marketData.Low
-		conditionOne := l.LastTrade.FuturesSide == futures.SideTypeSell && exitTargetDown < lowLinear
-		conditionTwo := l.LastTrade.FuturesSide == futures.SideTypeBuy && exitTargetUp > upLinear
+		//conditionOne := l.LastTrade.FuturesSide == futures.SideTypeSell && exitTargetDown < lowLinear
+		//conditionTwo := l.LastTrade.FuturesSide == futures.SideTypeBuy && exitTargetUp > upLinear
+		takeProfitSell := l.LastTrade.FuturesSide == futures.SideTypeSell && exitTargetDown < l.TakeProfitPrice
+		takeProfitBuy := l.LastTrade.FuturesSide == futures.SideTypeBuy && exitTargetUp > l.TakeProfitPrice
 
-		if conditionOne || conditionTwo {
+		if takeProfitSell || takeProfitBuy {
 			l.CloseAllTrades()
+		}
+		return
+	}
+
+	//if lowLinear > targetDown && lowRegular > targetDown{
+	//	l.breakDown = true
+	//	return
+	//} else if upLinear < targetUp && upRegular < targetUp {
+	//	l.breakUp = true
+	//	return
+	//}
+
+	//if l.breakUp && upLinear > targetUp {
+	//	l.breakUp = false
+	//	err := l.HandleSell(marketData)
+	//	if err != nil {
+	//		logs.LogError(err)
+	//	}
+	//
+	//	l.takeProfitPrice = lowLinear
+	//
+	//	return
+	//} else if l.breakDown && lowLinear < targetDown{
+	//	l.breakDown = false
+	//	err := l.HandleBuy(marketData)
+	//	if err != nil {
+	//		logs.LogError(err)
+	//	}
+	//
+	//	l.takeProfitPrice = upLinear
+	//
+	//	return
+	//}
+
+	if upLinear < targetUp {
+		profit := l.GetPotentialProfit(true, linearMean, targetUp)
+		if profit < 0.005 {
 			return
 		}
-	}
 
-	if lowLinear > targetDown && lowRegular > targetDown{
-		l.breakDown = true
-		return
-	} else if upLinear < targetUp && upRegular < targetUp {
-		l.breakUp = true
-		return
-	}
-
-	if l.breakUp && upLinear > targetUp {
-		l.breakUp = false
 		err := l.HandleSell(marketData)
 		if err != nil {
 			logs.LogError(err)
 		}
+
+		l.TakeProfitPrice = linearMean
+
 		return
-	} else if l.breakDown && lowLinear < targetDown{
-		l.breakDown = false
+	} else if lowLinear > targetDown{
+		profit := l.GetPotentialProfit(true, linearMean, targetUp)
+		if profit < 0.005 {
+			return
+		}
+
 		err := l.HandleBuy(marketData)
 		if err != nil {
 			logs.LogError(err)
 		}
+
+		l.TakeProfitPrice = linearMean
+
 		return
 	}
 
@@ -157,6 +195,14 @@ func (l *linearRegression) LastLow() float64 {
 
 func (l *linearRegression) LastHigh() float64 {
 	return l.highPriceObservations[l.config.Period-1]
+}
+
+func (l *linearRegression) GetPotentialProfit(sell bool,targetPrice, currentPrice float64) float64 {
+	if sell {
+		return (currentPrice / targetPrice) - 1
+	} else {
+		return (targetPrice / currentPrice) - 1
+	}
 }
 
 
