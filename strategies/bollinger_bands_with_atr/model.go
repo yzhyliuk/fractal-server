@@ -2,12 +2,15 @@ package bollinger_bands_with_atr
 
 import (
 	"encoding/json"
+	"github.com/adshao/go-binance/v2/futures"
+	"newTradingBot/api/database"
 	"newTradingBot/indicators"
 	"newTradingBot/logs"
 	"newTradingBot/models/account"
 	"newTradingBot/models/block"
 	"newTradingBot/models/strategy"
 	"newTradingBot/models/strategy/instance"
+	"newTradingBot/models/testing"
 	"newTradingBot/models/users"
 	"newTradingBot/strategies/common"
 )
@@ -16,15 +19,18 @@ type BollingerBandsWithATR struct {
 	common.Strategy
 	config BollingerBandsWithATRConfig
 
+	candles    []*block.Data
 	closePrice []float64
-	openPrice	[]float64
-	lowPrice []float64
-	highPrice []float64
 
-	orderTargetPrice float64
-	orderStopLossPrice float64
+	upBreakOut  bool
+	lowBreakOut bool
 
-	observationsLength int
+	lastUpperB float64
+	lastLowerB float64
+
+	reverseSignal bool
+
+	waiting int
 }
 
 const StrategyName = "bollinger_bands_with_atr"
@@ -36,20 +42,16 @@ func NewBollingerBandsWithATR(monitorChannel chan *block.Data, configRaw []byte,
 
 	err := json.Unmarshal(configRaw, &config)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 
-	observationsLength := indicators.MaxOf3int(config.MALength, config.BBLength, config.ATRLength)
-
-	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
+	acc, err := account.NewBinanceAccount(keys.ApiKey, keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	if err != nil {
 		return nil, err
 	}
 
-
 	newStrategy := &BollingerBandsWithATR{
 		config: config,
-		observationsLength: observationsLength,
 	}
 	newStrategy.Account = acc
 	newStrategy.StopSignal = make(chan bool)
@@ -57,62 +59,88 @@ func NewBollingerBandsWithATR(monitorChannel chan *block.Data, configRaw []byte,
 	newStrategy.StrategyInstance = inst
 	newStrategy.HandlerFunction = newStrategy.HandlerFunc
 	newStrategy.DataProcessFunction = newStrategy.ProcessData
-	newStrategy.closePrice = make([]float64, observationsLength)
-	newStrategy.openPrice = make([]float64, observationsLength)
-	newStrategy.highPrice = make([]float64, observationsLength)
-	newStrategy.lowPrice = make([]float64, observationsLength)
+
+	newStrategy.candles = make([]*block.Data, config.MALength)
+	newStrategy.closePrice = make([]float64, config.MALength)
 
 	return newStrategy, nil
 }
 
-func (m *BollingerBandsWithATR) HandlerFunc(marketData *block.Data)  {
-
-	//slope := m.closePrice[m.observationsLength-1]/m.closePrice[m.observationsLength-2]
-
-	//longTermMA := indicators.SimpleMA(m.closePrice,m.config.MALength)
-	//shortTermMA := indicators.SimpleMA(m.closePrice,m.config.MALength/2)
-
-	upperBB, lowerBB := indicators.BollingerBands(m.closePrice, m.config.BBLength, m.config.BBMultiplier)
-
-	atr := indicators.AverageTrueRange(m.highPrice, m.lowPrice, m.closePrice, m.config.ATRLength)
-
-	//if atr[m.observationsLength-1] < atr[m.observationsLength-2] {
-	//	m.CloseAllTrades()
-	//}
-
-	if (marketData.High > upperBB) && (atr[m.observationsLength-1] > atr[m.observationsLength-2]) {
-		// Sell
-		err := m.HandleSell(marketData)
-		if err != nil {
-			logs.LogError(err)
+func (m *BollingerBandsWithATR) HandlerFunc(marketData *block.Data) {
+	if m.candles[0] != nil {
+		if m.StrategyInstance.Status == instance.StatusCreated && m.StrategyInstance.Testing == testing.Disable {
+			m.StrategyInstance.Status = instance.StatusRunning
+			db, _ := database.GetDataBaseConnection()
+			_ = instance.UpdateStatus(db, m.StrategyInstance.ID, instance.StatusRunning)
 		}
-		return
-	}
 
-	if (marketData.Low < lowerBB) && (atr[m.observationsLength-1] > atr[m.observationsLength-2]) {
-		//Sell
-		err := m.HandleBuy(marketData)
-		if err != nil {
-			logs.LogError(err)
+		sd := indicators.StandardDeviation(m.closePrice)
+		mean := indicators.Average(m.closePrice)
+		up := mean + m.config.BBMultiplier*sd
+		low := mean - m.config.BBMultiplier*sd
+		rsi := indicators.RSI(m.closePrice, 14)
+
+		m.reverseSignal = false
+		m.reverseSignal = ((marketData.ClosePrice < m.lastUpperB) && m.upBreakOut && rsi < 70) || ((marketData.ClosePrice > m.lastLowerB) && m.lowBreakOut && rsi > 30)
+
+		if m.LastTrade != nil {
+			if m.waiting > 5 {
+				m.waiting = 0
+				m.lowBreakOut = false
+				m.upBreakOut = false
+			} else if m.waiting != 0 {
+				m.waiting++
+			}
+
+			exitBuy := m.LastTrade.FuturesSide == futures.SideTypeBuy && rsi > 55
+			exitSell := m.LastTrade.FuturesSide == futures.SideTypeSell && rsi < 45
+
+			if exitSell || exitBuy {
+				m.CloseAllTrades()
+			}
+		} else {
+			m.waiting = 0
 		}
-		return
+
+		if marketData.ClosePrice > up {
+			m.upBreakOut = true
+			m.lastUpperB = up
+			m.waiting = 1
+		} else if marketData.ClosePrice < low {
+			m.lowBreakOut = true
+			m.lastLowerB = low
+			m.waiting = 1
+		}
+
+		if m.upBreakOut && m.reverseSignal {
+			err := m.HandleSell(marketData)
+			if err != nil {
+				logs.LogError(err)
+			}
+			m.upBreakOut = false
+			m.TakeProfitPrice = mean
+		}
+
+		if m.lowBreakOut && m.reverseSignal {
+			err := m.HandleBuy(marketData)
+			if err != nil {
+				logs.LogError(err)
+			}
+			m.lowBreakOut = false
+			m.TakeProfitPrice = mean
+		}
+
 	}
 }
 
-func (m *BollingerBandsWithATR) ProcessData(marketData *block.Data)  {
+func (m *BollingerBandsWithATR) ProcessData(marketData *block.Data) {
+	m.candles = m.candles[1:]
+	m.candles = append(m.candles, marketData)
+
 	m.closePrice = m.closePrice[1:]
 	m.closePrice = append(m.closePrice, marketData.ClosePrice)
-
-	m.openPrice = m.openPrice[1:]
-	m.openPrice = append(m.openPrice, marketData.OpenPrice)
-
-	m.highPrice = m.highPrice[1:]
-	m.highPrice = append(m.highPrice, marketData.High)
-
-	m.lowPrice = m.lowPrice[1:]
-	m.lowPrice = append(m.lowPrice, marketData.Low)
 }
 
-func (m *BollingerBandsWithATR) CustomTakeProfitAndStopLoss()  {
+func (m *BollingerBandsWithATR) CustomTakeProfitAndStopLoss() {
 
 }

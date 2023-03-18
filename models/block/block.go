@@ -2,6 +2,8 @@ package block
 
 import (
 	"github.com/lib/pq"
+	"gorm.io/gorm"
+	"newTradingBot/api/database"
 	"time"
 )
 
@@ -11,8 +13,8 @@ const CapturedDataTableName = "captured_data"
 type Data struct {
 	Symbol string `json:"symbol" gorm:"column:symbol"`
 
-	TradesCount int `json:"tradesCount" gorm:"column:tradescount"`
-	Time   time.Duration `json:"-" gorm:"-"`
+	TradesCount int           `json:"tradesCount" gorm:"column:tradescount"`
+	Time        time.Duration `json:"-" gorm:"-"`
 
 	Volume float64 `json:"volume" gorm:"column:volume"`
 
@@ -32,8 +34,8 @@ type Data struct {
 type CapturedData struct {
 	ID int `json:"id" gorm:"column:id"`
 	Data
-	CaptureID int `json:"captureId" gorm:"column:captureid"`
-	Trades pq.Float64Array `json:"-" gorm:"type:numeric[]"`
+	CaptureID int             `json:"captureId" gorm:"column:captureid"`
+	Trades    pq.Float64Array `json:"-" gorm:"type:numeric[]"`
 }
 
 func (c *CapturedData) ExtractData() *Data {
@@ -49,4 +51,20 @@ func (c *CapturedData) ConvertToDbObject() *CapturedData {
 
 func (c *CapturedData) TableName() string {
 	return CapturedDataTableName
+}
+
+func GetCaptureDataBySessionId(sessionID int, db *gorm.DB) ([]CapturedData, error) {
+	db, err := database.GetDataBaseConnection()
+	if err != nil {
+		return nil, err
+	}
+
+	var marketData []CapturedData
+
+	err = db.Where("captureid = ?", sessionID).Order("id asc").Find(&marketData).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return marketData, nil
 }

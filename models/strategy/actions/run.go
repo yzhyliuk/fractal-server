@@ -28,13 +28,13 @@ func PrepareStrategy(conf configs.BaseStrategyConfig, userID int, strategyID int
 		return nil, nil, nil, err
 	}
 
-	monitorName := fmt.Sprintf("%s:%d:%t",conf.Pair, conf.TimeFrame, inst.IsFutures)
+	monitorName := fmt.Sprintf("%s:%d:%t", conf.Pair, conf.TimeFrame, inst.IsFutures)
 
 	var monitorChannel chan *block.Data
-	if storage.MonitorsBinance[monitorName] != nil{
+	if storage.MonitorsBinance[monitorName] != nil {
 		monitorChannel = storage.MonitorsBinance[monitorName].Subscribe(inst.ID)
 	} else {
-		monitor := monitoring.NewBinanceMonitor(conf.Pair, time.Duration(conf.TimeFrame*int(time.Second)),inst.IsFutures)
+		monitor := monitoring.NewBinanceMonitor(conf.Pair, time.Duration(conf.TimeFrame*int(time.Second)), inst.IsFutures)
 		storage.MonitorsBinance[monitorName] = monitor
 		storage.MonitorsBinance[monitorName].RunMonitor()
 		monitorChannel = storage.MonitorsBinance[monitorName].Subscribe(inst.ID)
@@ -78,7 +78,7 @@ func PrepareBackTesting(conf configs.BaseStrategyConfig, captureSession, userID,
 	var session recording.CapturedSession
 	err = db.Where("id = ?", captureSession).Find(&session).Error
 	if err != nil {
-		return nil, nil, nil ,err
+		return nil, nil, nil, err
 	}
 
 	conf.Pair = session.Symbol

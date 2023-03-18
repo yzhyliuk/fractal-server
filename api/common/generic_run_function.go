@@ -13,37 +13,22 @@ import (
 	"newTradingBot/models/users"
 	"newTradingBot/storage"
 	"newTradingBot/strategies/bollinger_bands_with_atr"
-	"newTradingBot/strategies/glide_on_price"
-	"newTradingBot/strategies/linear_regression"
-	"newTradingBot/strategies/mac"
-	"newTradingBot/strategies/mean_reversion"
-	qqe "newTradingBot/strategies/qqe_strategy"
+	"newTradingBot/strategies/price_channel_breakout"
 	"newTradingBot/strategies/regression_channels"
-	"newTradingBot/strategies/rsi_crossover"
-	"newTradingBot/strategies/simple_rsi"
-	"newTradingBot/strategies/trend_with_rsi"
 )
 
-var NewStrategy = map[string]func(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
-	simple_rsi.StrategyName: simple_rsi.NewSimpleRSI,
-	glide_on_price.StrategyName: glide_on_price.NewGlideOnPriceStrategy,
-	linear_regression.StrategyName: linear_regression.NewLinearRegression,
-	mac.StrategyName: mac.NewMacStrategy,
-	mean_reversion.StrategyName: mean_reversion.NewMeanReversion,
-	qqe.StrategyName: qqe.NewQQEStrategy,
-	regression_channels.StrategyName: regression_channels.NewLinearRegression,
-	rsi_crossover.StrategyName: rsi_crossover.NewRSICrossoverStrategy,
-	trend_with_rsi.StrategyName: trend_with_rsi.NewTrendFollowWithRSIStrategy,
+var NewStrategy = map[string]func(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error){
+	regression_channels.StrategyName:      regression_channels.NewLinearRegression,
+	price_channel_breakout.StrategyName:   price_channel_breakout.NewPriceChannelBreakoutStrategy,
 	bollinger_bands_with_atr.StrategyName: bollinger_bands_with_atr.NewBollingerBandsWithATR,
 }
-
 
 func RunFunction(userID int, rawConfig []byte, test, strategyID int, strategyName string, sessionID *int) ([]*trade.Trade, *int, error) {
 	var genericConfig configs.GenericConfig
 
 	err := json.Unmarshal(rawConfig, &genericConfig)
 	if err != nil {
-		return nil, nil,err
+		return nil, nil, err
 	}
 
 	var inst *instance.StrategyInstance
@@ -54,7 +39,7 @@ func RunFunction(userID int, rawConfig []byte, test, strategyID int, strategyNam
 
 	if test == testing.Disable {
 		inst, monitorChannel, keys, err = actions.PrepareStrategy(genericConfig.BaseStrategyConfig, userID, strategyID)
-	} else if test == testing.BackTest{
+	} else if test == testing.BackTest {
 		inst, replayMonitor, keys, err = actions.PrepareBackTesting(genericConfig.BaseStrategyConfig, *sessionID, userID, strategyID)
 		monitorChannel = replayMonitor.OutputChannel
 	} else if test == testing.LiveTest {
@@ -64,7 +49,6 @@ func RunFunction(userID int, rawConfig []byte, test, strategyID int, strategyNam
 	if err != nil {
 		return nil, nil, err
 	}
-
 
 	strat, err := NewStrategy[strategyName](monitorChannel, rawConfig, keys, nil, inst)
 	if err != nil {
@@ -84,10 +68,9 @@ func RunFunction(userID int, rawConfig []byte, test, strategyID int, strategyNam
 		strat.Stop()
 
 		return trades, nil, nil
-	} else  if test == testing.LiveTest {
+	} else if test == testing.LiveTest {
 
 	}
 
 	return nil, nil, nil
 }
-

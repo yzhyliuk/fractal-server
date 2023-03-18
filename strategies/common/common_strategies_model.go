@@ -23,27 +23,27 @@ const lowPriceDefault = 9999999999.
 
 type Strategy struct {
 	StrategyInstance *instance.StrategyInstance
-	Account account.Account
-	MonitorChannel chan *block.Data
-	StopSignal chan bool
-	LastTrade *trade.Trade
+	Account          account.Account
+	MonitorChannel   chan *block.Data
+	StopSignal       chan bool
+	LastTrade        *trade.Trade
 
-	trades []*trade.Trade
+	trades      []*trade.Trade
 	TotalProfit float64
 
 	prevMarketData *block.Data
 
-	currentMarketData *block.Data
-	Stopped bool
-	HandlerFunction func(marketData *block.Data)
+	currentMarketData   *block.Data
+	Stopped             bool
+	HandlerFunction     func(marketData *block.Data)
 	DataProcessFunction func(marketData *block.Data)
 	ExperimentalHandler func()
 
 	TakeProfitPrice float64
-	StopLossPrice float64
+	StopLossPrice   float64
 }
 
-func (m *Strategy) Execute()  {
+func (m *Strategy) Execute() {
 	m.TotalProfit = 0
 	m.trades = make([]*trade.Trade, 0)
 
@@ -52,19 +52,26 @@ func (m *Strategy) Execute()  {
 	}
 
 	go func() {
-		for  {
+		for {
 			select {
 			case <-m.StopSignal:
 				return
 			default:
-				marketData := <- m.MonitorChannel
+				marketData := <-m.MonitorChannel
 				if m.Stopped {
 					return
 				}
 
 				m.currentMarketData = marketData
 
+				m.CalculateTradeData(marketData)
+				m.HandleStrategyDefinedStopLoss(marketData)
+
 				//marketData = m.ToHeikinAshi(marketData)
+
+				if m.LastTrade != nil {
+					m.LastTrade.LengthCounter++
+				}
 
 				if m.StopLossCondition() {
 					continue
@@ -91,11 +98,11 @@ func (q *Strategy) ChangeBid(bid float64) error {
 	return db.Save(q.StrategyInstance).Error
 }
 
-func (g *Strategy) ToHeikinAshi(marketData *block.Data) *block.Data{
+func (g *Strategy) ToHeikinAshi(marketData *block.Data) *block.Data {
 	closeP := (marketData.ClosePrice + marketData.OpenPrice + marketData.High + marketData.Low) / float64(4)
 	open := marketData.OpenPrice
 	if g.prevMarketData != nil {
-		open = (g.prevMarketData.OpenPrice+g.prevMarketData.ClosePrice)/float64(2)
+		open = (g.prevMarketData.OpenPrice + g.prevMarketData.ClosePrice) / float64(2)
 	}
 	high := indicators.Max([]float64{marketData.High, marketData.OpenPrice, marketData.ClosePrice})
 	low := indicators.Min([]float64{marketData.Low, marketData.OpenPrice, marketData.ClosePrice})
@@ -110,10 +117,9 @@ func (g *Strategy) ToHeikinAshi(marketData *block.Data) *block.Data{
 	return marketData
 }
 
-
-func (m *Strategy) HandleTPansSL(marketData *block.Data)  {
+func (m *Strategy) HandleTPansSL(marketData *block.Data) {
 	// TODO : TP and SL for spot trading
-	if  m.LastTrade == nil || !m.StrategyInstance.IsFutures{
+	if m.LastTrade == nil || !m.StrategyInstance.IsFutures {
 		return
 	}
 
@@ -124,16 +130,17 @@ func (m *Strategy) HandleTPansSL(marketData *block.Data)  {
 
 	switch m.LastTrade.FuturesSide {
 	case futures.SideTypeBuy:
-		profit = (m.LastTrade.Quantity*price)-m.LastTrade.USD
+		profit = (m.LastTrade.Quantity * price) - m.LastTrade.USD
 	case futures.SideTypeSell:
-		profit = (m.LastTrade.Quantity*m.LastTrade.PriceOpen)-(m.LastTrade.Quantity*price)
+		profit = (m.LastTrade.Quantity * m.LastTrade.PriceOpen) - (m.LastTrade.Quantity * price)
 	}
 
-	fee := m.LastTrade.USD*trade.BinanceFuturesTakerFeeRate
-	profit -= 2*fee
+	fee := m.LastTrade.USD * trade.BinanceFuturesTakerFeeRate
+	profit -= 2 * fee
 
 	roi = profit / (m.LastTrade.USD / float64(*m.LastTrade.Leverage))
 
+	// Trade stop loss
 	if m.StrategyInstance.TradeStopLoss != 0 {
 		if roi < m.StrategyInstance.TradeStopLoss*-1 {
 			if m.StrategyInstance.Testing == testing.BackTest {
@@ -144,6 +151,7 @@ func (m *Strategy) HandleTPansSL(marketData *block.Data)  {
 		}
 	}
 
+	// trade take profit
 	if m.StrategyInstance.TradeTakeProfit != 0 {
 		if roi > m.StrategyInstance.TradeTakeProfit {
 			if m.StrategyInstance.Testing == testing.BackTest {
@@ -155,7 +163,7 @@ func (m *Strategy) HandleTPansSL(marketData *block.Data)  {
 	}
 }
 
-func (m *Strategy) ExecuteExperimental()  {
+func (m *Strategy) ExecuteExperimental() {
 	m.ExperimentalHandler()
 }
 
@@ -180,7 +188,7 @@ func (m *Strategy) StopLossCondition() bool {
 			}
 		}()
 
-		err := notifications.CreateUserNotification(db, m.StrategyInstance.UserID,notifications.Warning,notifications.StrategyStopLoss(m.StrategyInstance.Pair,m.TotalProfit))
+		err := notifications.CreateUserNotification(db, m.StrategyInstance.UserID, notifications.Warning, notifications.StrategyStopLoss(m.StrategyInstance.Pair, m.TotalProfit))
 		if err != nil {
 			logs.LogError(err)
 		}
@@ -196,7 +204,7 @@ func (m *Strategy) HandleSell(marketData *block.Data) error {
 		if m.LastTrade == nil {
 			return m.sell(marketData)
 		}
-		if m.LastTrade.FuturesSide != futures.SideTypeSell{
+		if m.LastTrade.FuturesSide != futures.SideTypeSell {
 			return m.sell(marketData)
 		}
 		return nil
@@ -204,8 +212,6 @@ func (m *Strategy) HandleSell(marketData *block.Data) error {
 		return m.sell(marketData)
 	}
 }
-
-
 
 func (m *Strategy) HandleBuy(marketData *block.Data) error {
 	if m.StrategyInstance.IsFutures {
@@ -243,7 +249,7 @@ func (m *Strategy) buy(marketData *block.Data) error {
 
 		m.LastTrade = futuresTrade
 	} else {
-		spotTrade, err := m.Account.PlaceMarketOrder(quantity, m.StrategyInstance.Pair,binance.SideTypeBuy, m.StrategyInstance, m.LastTrade)
+		spotTrade, err := m.Account.PlaceMarketOrder(quantity, m.StrategyInstance.Pair, binance.SideTypeBuy, m.StrategyInstance, m.LastTrade)
 		if err != nil {
 			return err
 		}
@@ -290,8 +296,8 @@ func (m *Strategy) sell(marketData *block.Data) error {
 	return nil
 }
 
-func (m *Strategy) closePreviousTrade()  {
-	if m.StrategyInstance.Testing == testing.BackTest{
+func (m *Strategy) closePreviousTrade() {
+	if m.StrategyInstance.Testing == testing.BackTest {
 		return
 	}
 	tradeClosed, err := m.Account.CloseFuturesPosition(m.LastTrade)
@@ -303,8 +309,8 @@ func (m *Strategy) closePreviousTrade()  {
 	m.LastTrade = nil
 }
 
-func (m *Strategy) Stop()  {
-		db, err := database.GetDataBaseConnection()
+func (m *Strategy) Stop() {
+	db, err := database.GetDataBaseConnection()
 	if err != nil {
 		logs.LogDebug("", err)
 	}
@@ -323,23 +329,24 @@ func (m *Strategy) CloseAllTrades() {
 	if m.StrategyInstance.Testing == testing.BackTest {
 		m.TestingCloseTrade(m.currentMarketData)
 	}
-	if m.LastTrade != nil && !m.StrategyInstance.IsFutures{
+	if m.LastTrade != nil && !m.StrategyInstance.IsFutures {
 		err := m.HandleSell(nil)
 		if err != nil {
-			logs.LogDebug("",err)
+			logs.LogDebug("", err)
 		}
-	} else if m.LastTrade != nil && m.StrategyInstance.IsFutures{
+	} else if m.LastTrade != nil && m.StrategyInstance.IsFutures {
 		m.closePreviousTrade()
 	}
 }
 
-func (m *Strategy) TestingBuy(marketData *block.Data, quantity float64)  {
+func (m *Strategy) TestingBuy(marketData *block.Data, quantity float64) {
 	newTrade := &trade.Trade{
-		Quantity: quantity,
-		IsFutures: m.StrategyInstance.IsFutures,
-		USD: m.StrategyInstance.Bid,
-		PriceOpen: marketData.ClosePrice,
-		FuturesSide: futures.SideTypeBuy,
+		Quantity:      quantity,
+		IsFutures:     m.StrategyInstance.IsFutures,
+		USD:           m.StrategyInstance.Bid,
+		PriceOpen:     marketData.ClosePrice,
+		FuturesSide:   futures.SideTypeBuy,
+		LengthCounter: 0,
 	}
 
 	if m.StrategyInstance.IsFutures {
@@ -364,13 +371,14 @@ func (m *Strategy) TestingBuy(marketData *block.Data, quantity float64)  {
 	}
 }
 
-func (m *Strategy) TestingSell(marketData *block.Data, quantity float64)  {
+func (m *Strategy) TestingSell(marketData *block.Data, quantity float64) {
 	newTrade := &trade.Trade{
-		Quantity: quantity,
-		USD: m.StrategyInstance.Bid,
-		PriceOpen: marketData.ClosePrice,
-		IsFutures: m.StrategyInstance.IsFutures,
-		FuturesSide: futures.SideTypeSell,
+		Quantity:      quantity,
+		USD:           m.StrategyInstance.Bid,
+		PriceOpen:     marketData.ClosePrice,
+		IsFutures:     m.StrategyInstance.IsFutures,
+		FuturesSide:   futures.SideTypeSell,
+		LengthCounter: 0,
 	}
 
 	if m.StrategyInstance.IsFutures {
@@ -391,7 +399,7 @@ func (m *Strategy) TestingSell(marketData *block.Data, quantity float64)  {
 	}
 }
 
-func (m *Strategy) TestingCloseTrade(marketData *block.Data)  {
+func (m *Strategy) TestingCloseTrade(marketData *block.Data) {
 	if m.LastTrade != nil {
 		closedTrade := m.LastTrade
 		closedTrade.PriceClose = marketData.ClosePrice
@@ -401,13 +409,41 @@ func (m *Strategy) TestingCloseTrade(marketData *block.Data)  {
 	}
 }
 
+func (m *Strategy) HandleStrategyDefinedStopLoss(data *block.Data) {
+	if m.LastTrade != nil {
+		exitTargetUp := data.High
+		exitTargetDown := data.Low
+
+		takeProfitSell := false
+		takeProfitBuy := false
+
+		stopLossSell := false
+		stopLossBuy := false
+
+		if m.TakeProfitPrice != 0 {
+			takeProfitSell = m.LastTrade.FuturesSide == futures.SideTypeSell && exitTargetDown < m.TakeProfitPrice
+			takeProfitBuy = m.LastTrade.FuturesSide == futures.SideTypeBuy && exitTargetUp > m.TakeProfitPrice
+		}
+
+		if m.StopLossPrice != 0 {
+			stopLossSell = m.LastTrade.FuturesSide == futures.SideTypeSell && exitTargetUp > m.StopLossPrice
+			stopLossBuy = m.LastTrade.FuturesSide == futures.SideTypeBuy && exitTargetDown < m.StopLossPrice
+		}
+
+		if takeProfitSell || takeProfitBuy || stopLossSell || stopLossBuy {
+			m.CloseAllTrades()
+			return
+		}
+	}
+}
+
 func (m *Strategy) CalculateStopLossPrice(priceCurrent float64, sell bool) float64 {
 	sl := m.StrategyInstance.TradeStopLoss
 	if sl == 0 {
 		return 0
 	}
 
-	priceDelta :=  priceCurrent*(sl/float64(*m.StrategyInstance.Leverage))
+	priceDelta := priceCurrent * (sl / float64(*m.StrategyInstance.Leverage))
 
 	if sell {
 		return priceCurrent + priceDelta
@@ -416,13 +452,34 @@ func (m *Strategy) CalculateStopLossPrice(priceCurrent float64, sell bool) float
 	}
 }
 
+func (m *Strategy) CalculateTradeData(marketData *block.Data) {
+	if m.LastTrade != nil {
+		profit := 0.
+		if m.LastTrade.FuturesSide == futures.SideTypeBuy {
+			profit = (m.LastTrade.Quantity * marketData.Low) - m.LastTrade.USD
+		} else {
+			profit = (m.LastTrade.Quantity * m.LastTrade.PriceOpen) - (m.LastTrade.Quantity * marketData.High)
+
+		}
+
+		roi := profit / (m.LastTrade.USD / float64(*m.LastTrade.Leverage))
+		if m.LastTrade.MaxDropDown == 0 || m.LastTrade.MaxDropDown > roi {
+			m.LastTrade.MaxDropDown = roi
+		}
+
+		if m.LastTrade.MaxHeadUp == 0 || m.LastTrade.MaxHeadUp < roi {
+			m.LastTrade.MaxHeadUp = roi
+		}
+	}
+}
+
 func (m *Strategy) LivePriceMonitoring() {
 	go func() {
-		for{
+		for {
 			if m.Stopped {
 				break
 			} else if m.LastTrade == nil {
-				time.Sleep(10*time.Second)
+				time.Sleep(10 * time.Second)
 				continue
 			}
 
@@ -441,13 +498,13 @@ func (m *Strategy) LivePriceMonitoring() {
 
 			_, stopC, _ := futures.WsAggTradeServe(m.StrategyInstance.Pair, wsAggTradeHandler, nil)
 
-			time.Sleep(time.Second*5)
+			time.Sleep(time.Second * 5)
 
 			stopC <- struct{}{}
 
 			shouldClose := false
 
-			if m.LastTrade != nil && (lowPrice != lowPriceDefault || highPrice != maxPriceDefault){
+			if m.LastTrade != nil && (lowPrice != lowPriceDefault || highPrice != maxPriceDefault) {
 				if m.StopLossPrice != 0 {
 					switch m.LastTrade.FuturesSide {
 					case futures.SideTypeSell:

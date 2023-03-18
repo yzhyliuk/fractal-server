@@ -6,7 +6,7 @@ import (
 	"newTradingBot/api/controllers"
 )
 
-func publicRoutes(app *fiber.App)  {
+func publicRoutes(app *fiber.App) {
 	userController := &controllers.UserController{}
 	authController := &controllers.AuthController{}
 	uiController := &controllers.UiController{}
@@ -14,6 +14,8 @@ func publicRoutes(app *fiber.App)  {
 
 	app.Get("/ping", base.Ping)
 	app.Get("/ui/:form", uiController.GetFormFields)
+	app.Get("/nn-params", uiController.GetNeuralNetworkParams)
+	app.Get("/nn-activations", uiController.GetActivationsParams)
 	app.Get("/verify", userController.VerifyEmail)
 	app.Get("/request-reset", userController.InitPasswordReset)
 	app.Post("/reset-password", userController.ResetPassword)
@@ -24,7 +26,7 @@ func publicRoutes(app *fiber.App)  {
 
 }
 
-func userRoutes(app *fiber.App)  {
+func userRoutes(app *fiber.App) {
 	userController := &controllers.UserController{}
 	usersGroup := app.Group("/users")
 	usersGroup.Get("/get-finances", userController.GetUserBalance)
@@ -49,10 +51,12 @@ func testingRoutes(app *fiber.App) {
 	testingGroup.Get("/stop-capture", testingController.StopCapture)
 	testingGroup.Get("/sessions", testingController.GetSessionsForUser)
 	testingGroup.Get("/delete-session", testingController.DeleteCapture)
+	testingGroup.Get("/data-params", testingController.GetSelectDataOptions)
 	testingGroup.Get("/ws", websocket.New(testingController.HandleWS))
+	testingGroup.Get("/v2/ws", websocket.New(testingController.HandleWSv2))
 }
 
-func notificationsRoutes(app *fiber.App)  {
+func notificationsRoutes(app *fiber.App) {
 	nfController := &controllers.NotificationController{}
 	nfGroup := app.Group("/notifications")
 	nfGroup.Get("", nfController.ListNotificationsForUser)
@@ -60,7 +64,7 @@ func notificationsRoutes(app *fiber.App)  {
 	nfGroup.Get("/dismiss", nfController.DismissAll)
 }
 
-func strategyRoutes(app *fiber.App)  {
+func strategyRoutes(app *fiber.App) {
 	strategyController := &controllers.StrategyController{}
 	strategiesGroup := app.Group("/strategies")
 	strategiesGroup.Get("/list", strategyController.GetStrategies)
@@ -71,7 +75,7 @@ func strategyRoutes(app *fiber.App)  {
 	strategiesGroup.Get("/instances/:id", strategyController.GetInstance)
 	strategiesGroup.Delete("/instances/:id", strategyController.Delete)
 	strategiesGroup.Post("/instances/delete-selected", strategyController.DeleteSelected)
-	strategiesGroup.Get("/instances/:id/trades",strategyController.GetTradesForInstance)
+	strategiesGroup.Get("/instances/:id/trades", strategyController.GetTradesForInstance)
 	strategiesGroup.Get("/instances/:id/stop", strategyController.StopStrategy)
 	strategiesGroup.Post("/run-arbitrage", strategyController.RunArbitrage)
 	strategiesGroup.Post("/move-to-archive", strategyController.ArchiveStrategies)
@@ -80,4 +84,10 @@ func strategyRoutes(app *fiber.App)  {
 	strategiesGroup.Delete("/config/:id", strategyController.DeleteConfig)
 	strategiesGroup.Get("/instances/config/:id", strategyController.GetInstanceConfig)
 	strategiesGroup.Post("/instances/config/change", strategyController.ChangeConfig)
+}
+
+func neuralNetworkRoutes(app *fiber.App) {
+	NNController := &controllers.NeuralNetworkController{}
+	nnGroup := app.Group("/neural")
+	nnGroup.Get("test", NNController.RunTestOnNeuralNetwork)
 }

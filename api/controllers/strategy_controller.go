@@ -27,7 +27,7 @@ type StrategyController struct {
 
 const FuturesType = "futures"
 
-func (s *StrategyController) GetStrategies(c *fiber.Ctx) error  {
+func (s *StrategyController) GetStrategies(c *fiber.Ctx) error {
 
 	db := s.GetFilteredDB(c)
 
@@ -39,7 +39,7 @@ func (s *StrategyController) GetStrategies(c *fiber.Ctx) error  {
 	return c.JSON(strategies)
 }
 
-func (s *StrategyController) GetStrategyFields(c *fiber.Ctx) error  {
+func (s *StrategyController) GetStrategyFields(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Query("id"))
 	if err != nil {
 		return err
@@ -47,12 +47,12 @@ func (s *StrategyController) GetStrategyFields(c *fiber.Ctx) error  {
 
 	isFutures := c.Query("type") == FuturesType
 
-	fields, err := apimodels.GetStrategyFields(s.GetDB(), id,isFutures)
+	fields, err := apimodels.GetStrategyFields(s.GetDB(), id, isFutures)
 	if err != nil {
 		return err
 	}
 
-	defaultFields, err := apimodels.GetDefaultFields(s.GetDB(),isFutures)
+	defaultFields, err := apimodels.GetDefaultFields(s.GetDB(), isFutures)
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func (s *StrategyController) GetPairs(c *fiber.Ctx) error {
 
 	if typeOfPairs == "futures" {
 		tradingPairsSource = common.FuturesTradingPairs
-	} else  {
+	} else {
 		tradingPairsSource = common.SpotTradingPairs
 	}
 
@@ -88,7 +88,6 @@ func (s *StrategyController) GetPairs(c *fiber.Ctx) error {
 
 	return c.JSON(tradingPairs)
 }
-
 
 // RunStrategy - runs strategy with configuration from client side
 func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
@@ -129,7 +128,7 @@ func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
 		}
 
 		if sInfo.IsContinuous {
-			err = experimental.RunExperimentalContinuousStrategy(userinfo.UserID,rawConfig,0, nil)
+			err = experimental.RunExperimentalContinuousStrategy(userinfo.UserID, rawConfig, 0, nil)
 			if err != nil {
 				return err
 			}
@@ -141,7 +140,7 @@ func (s *StrategyController) RunStrategy(c *fiber.Ctx) error {
 			return err
 		}
 
-		err = instance.CreateConfig(*instanceID,rawConfig,s.GetDB())
+		err = instance.CreateConfig(*instanceID, rawConfig, s.GetDB())
 		if err != nil {
 			return err
 		}
@@ -184,7 +183,7 @@ func (s *StrategyController) StopStrategy(c *fiber.Ctx) error {
 func (s *StrategyController) GetInstances(c *fiber.Ctx) error {
 	userInfo, err := s.GetUserInfo(c)
 	if err != nil {
-			return err
+		return err
 	}
 
 	instances, err := instance.ListInstancesForUser(s.GetFilteredDB(c), userInfo.UserID)
@@ -252,7 +251,7 @@ func (s *StrategyController) DeleteSelected(c *fiber.Ctx) error {
 }
 
 // GetTradesForInstance - returns all the trades for given strategy instance
-func (s *StrategyController) GetTradesForInstance(c *fiber.Ctx) error  {
+func (s *StrategyController) GetTradesForInstance(c *fiber.Ctx) error {
 	instanceID, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
 		return err
@@ -263,7 +262,7 @@ func (s *StrategyController) GetTradesForInstance(c *fiber.Ctx) error  {
 		return err
 	}
 
-	trades, err := trade.GetTradesByInstanceID(s.GetDB(),userInfo.UserID, instanceID)
+	trades, err := trade.GetTradesByInstanceID(s.GetDB(), userInfo.UserID, instanceID)
 	if err != nil {
 		return err
 	}
@@ -313,7 +312,7 @@ func (s *StrategyController) SaveConfig(c *fiber.Ctx) error {
 		return err
 	}
 
-	err = configs.CreateConfig(s.GetDB(), rawConfig, userinfo.UserID, strategyID, config.Name )
+	err = configs.CreateConfig(s.GetDB(), rawConfig, userinfo.UserID, strategyID, config.Name)
 	if err != nil {
 		return err
 	}
@@ -359,9 +358,9 @@ func (s *StrategyController) DeleteConfig(c *fiber.Ctx) error {
 	return c.SendStatus(http.StatusOK)
 }
 
-func (s *StrategyController) RunArbitrage(c *fiber.Ctx) error  {
-	var config struct{
-		Target string `json:"target"`
+func (s *StrategyController) RunArbitrage(c *fiber.Ctx) error {
+	var config struct {
+		Target  string `json:"target"`
 		Primary string `json:"primary"`
 	}
 
@@ -380,9 +379,9 @@ func (s *StrategyController) RunArbitrage(c *fiber.Ctx) error  {
 		return err
 	}
 
-	acc , err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey,keys.ApiKey,keys.SecretKey)
+	acc, err := account.NewBinanceAccount(keys.ApiKey, keys.SecretKey, keys.ApiKey, keys.SecretKey)
 	go func() {
-		err = internal_arbitrage.RunArbitrageWithParams(config.Target, config.Primary, acc, 20)
+		err = internal_arbitrage.RunArbitrageWithParams(config.Target, config.Primary, acc, 15)
 	}()
 
 	return nil

@@ -1,9 +1,11 @@
-
 package indicators
 
-import "math"
+import (
+	"math"
+	"newTradingBot/models/block"
+)
 
-func LinearRegressionForTimeSeries(observations []float64) (slope, intercept float64){
+func LinearRegressionForTimeSeries(observations []float64) (slope, intercept float64) {
 	yMean := Average(observations)
 	xMean := MeanForSeries(len(observations))
 
@@ -13,15 +15,24 @@ func LinearRegressionForTimeSeries(observations []float64) (slope, intercept flo
 	for x, y := range observations {
 		//upperSum += (x - xMean)*(y - yMean)
 		//lowerSum += math.Pow(x - xMean, 2)
-		upperSum += (float64(x)-xMean)*(y-yMean)
-		lowerSum += math.Pow(float64(x)-xMean,2)
+		upperSum += (float64(x) - xMean) * (y - yMean)
+		lowerSum += math.Pow(float64(x)-xMean, 2)
 	}
 
-	slope = upperSum/lowerSum
+	slope = upperSum / lowerSum
 
 	intercept = yMean - slope*xMean
 
 	return
+}
+
+func LinearRegressionForDataFrameClosePrice(df []*block.Data) (slope, intercept float64) {
+	priceObservations := make([]float64, len(df))
+	for idx := range df {
+		priceObservations[idx] = df[idx].ClosePrice
+	}
+
+	return LinearRegressionForTimeSeries(priceObservations)
 }
 
 func MeanForSeries(num int) float64 {
@@ -31,6 +42,5 @@ func MeanForSeries(num int) float64 {
 		sum += float64(i)
 	}
 
-	return sum/float64(num)
+	return sum / float64(num)
 }
-

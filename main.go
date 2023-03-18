@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-func main()  {
+func main() {
 
 	mode := flag.String("mode", "dev", "launch mode: dev (development) | prod (production)")
 	flag.Parse()
@@ -27,10 +27,10 @@ func main()  {
 	} else if *mode == configuration.Dev {
 		configuration.Mode = configuration.Dev
 	} else {
-		configuration.Mode =configuration.DebugProd
+		configuration.Mode = configuration.DebugProd
 	}
 
-	c := make(chan os.Signal,1)
+	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	signal.Notify(c, syscall.SIGTERM)
 	signal.Notify(c, syscall.SIGINT)
@@ -77,12 +77,12 @@ func main()  {
 	}
 }
 
-func terminateAllStrategies()  {
+func terminateAllStrategies() {
 	logs.LogDebug("Terminating all strategies...", nil)
 	for _, v := range storage.StrategiesStorage {
 		v.Stop()
 	}
 	logs.LogDebug("All strategies are terminated.", nil)
-	time.Sleep(3*time.Second)
+	time.Sleep(3 * time.Second)
 	os.Exit(0)
 }
