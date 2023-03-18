@@ -248,4 +248,6 @@ func (e *experimentalContinuousStrategy) Stop() {
 	}
 
 	e.stopChannel <- struct{}{}
+
+	e.CloseAllTrades()
 }
