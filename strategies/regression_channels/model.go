@@ -22,10 +22,10 @@ type linearRegression struct {
 
 	config                 LinearRegressionConfig
 	closePriceObservations []float64
-	highPriceObservations []float64
-	lowPriceObservations []float64
+	highPriceObservations  []float64
+	lowPriceObservations   []float64
 
-	breakUp bool
+	breakUp   bool
 	breakDown bool
 
 	sdMultiplier float64
@@ -37,14 +37,13 @@ func NewLinearRegression(monitorChannel chan *block.Data, configRaw []byte, keys
 
 	err := json.Unmarshal(configRaw, &config)
 	if err != nil {
-		return nil,err
-	}
-
-	acc, err := account.NewBinanceAccount(keys.ApiKey,keys.SecretKey, keys.ApiKey, keys.SecretKey)
-	if err != nil {
 		return nil, err
 	}
 
+	acc, err := account.NewBinanceAccount(keys.ApiKey, keys.SecretKey, keys.ApiKey, keys.SecretKey)
+	if err != nil {
+		return nil, err
+	}
 
 	newStrategy := &linearRegression{
 		config: config,
@@ -55,7 +54,7 @@ func NewLinearRegression(monitorChannel chan *block.Data, configRaw []byte, keys
 	newStrategy.StrategyInstance = inst
 	newStrategy.HandlerFunction = newStrategy.HandlerFunc
 	newStrategy.DataProcessFunction = newStrategy.ProcessData
-	newStrategy.sdMultiplier = 2
+	newStrategy.sdMultiplier = 3
 
 	newStrategy.closePriceObservations = make([]float64, newStrategy.config.Period)
 	newStrategy.highPriceObservations = make([]float64, newStrategy.config.Period)
@@ -64,7 +63,7 @@ func NewLinearRegression(monitorChannel chan *block.Data, configRaw []byte, keys
 	return newStrategy, nil
 }
 
-func (l *linearRegression) HandlerFunc(marketData *block.Data)  {
+func (l *linearRegression) HandlerFunc(marketData *block.Data) {
 	if l.closePriceObservations[0] != 0 {
 		if l.StrategyInstance.Status == instance.StatusCreated && l.StrategyInstance.Testing == testing.Disable {
 			l.StrategyInstance.Status = instance.StatusRunning
@@ -80,18 +79,17 @@ func (l *linearRegression) HandlerFunc(marketData *block.Data)  {
 		sdLinear := indicators.StandardDeviationWithMean(l.closePriceObservations, linearMean)
 		sdRegular := indicators.StandardDeviation(l.closePriceObservations)
 
-		upperLinearLine := linearMean+(sdLinear*l.sdMultiplier)
-		lowerLinearLine := linearMean-(sdLinear*l.sdMultiplier)
+		upperLinearLine := linearMean + (sdLinear * l.sdMultiplier)
+		lowerLinearLine := linearMean - (sdLinear * l.sdMultiplier)
 
-		upperRegularLine := regularMean+(sdRegular*l.sdMultiplier)
-		lowerRegularLine := regularMean-(sdRegular*l.sdMultiplier)
-
+		upperRegularLine := regularMean + (sdRegular * l.sdMultiplier)
+		lowerRegularLine := regularMean - (sdRegular * l.sdMultiplier)
 
 		l.Evaluate(marketData, upperLinearLine, lowerLinearLine, linearMean, upperRegularLine, lowerRegularLine)
 	}
 }
 
-func (l *linearRegression) Evaluate(marketData *block.Data, upLinear, lowLinear, linearMean, upRegular, lowRegular float64)  {
+func (l *linearRegression) Evaluate(marketData *block.Data, upLinear, lowLinear, linearMean, upRegular, lowRegular float64) {
 
 	targetUp := marketData.ClosePrice
 	targetDown := marketData.ClosePrice
@@ -105,80 +103,63 @@ func (l *linearRegression) Evaluate(marketData *block.Data, upLinear, lowLinear,
 	if l.LastTrade != nil {
 		exitTargetUp := marketData.High
 		exitTargetDown := marketData.Low
-		//conditionOne := l.LastTrade.FuturesSide == futures.SideTypeSell && exitTargetDown < lowLinear
-		//conditionTwo := l.LastTrade.FuturesSide == futures.SideTypeBuy && exitTargetUp > upLinear
 		takeProfitSell := l.LastTrade.FuturesSide == futures.SideTypeSell && exitTargetDown < l.TakeProfitPrice
 		takeProfitBuy := l.LastTrade.FuturesSide == futures.SideTypeBuy && exitTargetUp > l.TakeProfitPrice
 
-		if takeProfitSell || takeProfitBuy {
+		stopLossSell := l.LastTrade.FuturesSide == futures.SideTypeSell && exitTargetUp > l.StopLossPrice
+		stopLossBuy := l.LastTrade.FuturesSide == futures.SideTypeBuy && exitTargetDown < l.StopLossPrice
+
+		if takeProfitSell || takeProfitBuy || stopLossSell || stopLossBuy {
 			l.CloseAllTrades()
 		}
 		return
 	}
 
-	//if lowLinear > targetDown && lowRegular > targetDown{
-	//	l.breakDown = true
-	//	return
-	//} else if upLinear < targetUp && upRegular < targetUp {
-	//	l.breakUp = true
-	//	return
-	//}
-
-	//if l.breakUp && upLinear > targetUp {
-	//	l.breakUp = false
-	//	err := l.HandleSell(marketData)
-	//	if err != nil {
-	//		logs.LogError(err)
-	//	}
-	//
-	//	l.takeProfitPrice = lowLinear
-	//
-	//	return
-	//} else if l.breakDown && lowLinear < targetDown{
-	//	l.breakDown = false
-	//	err := l.HandleBuy(marketData)
-	//	if err != nil {
-	//		logs.LogError(err)
-	//	}
-	//
-	//	l.takeProfitPrice = upLinear
-	//
-	//	return
-	//}
-
-	if upLinear < targetUp {
-		profit := l.GetPotentialProfit(true, linearMean, targetUp)
-		if profit < 0.005 {
-			return
-		}
-
-		err := l.HandleSell(marketData)
-		if err != nil {
-			logs.LogError(err)
-		}
-
-		l.TakeProfitPrice = linearMean
-
+	if lowLinear > targetDown && lowRegular > targetDown {
+		l.breakDown = true
 		return
-	} else if lowLinear > targetDown{
+	} else if upLinear < targetUp && upRegular < targetUp {
+		l.breakUp = true
+		return
+	}
+
+	if upLinear > targetUp && l.breakUp {
 		profit := l.GetPotentialProfit(true, linearMean, targetUp)
-		if profit < 0.005 {
+		if profit < 0.01 {
 			return
 		}
 
+		l.breakUp = false
 		err := l.HandleBuy(marketData)
 		if err != nil {
 			logs.LogError(err)
 		}
 
 		l.TakeProfitPrice = linearMean
+		l.StopLossPrice = marketData.ClosePrice + ((marketData.ClosePrice - linearMean) / 2)
+
+		return
+	} else if lowLinear < targetDown && l.breakDown {
+		profit := l.GetPotentialProfit(true, linearMean, targetUp)
+		if profit < 0.01 {
+			return
+		}
+
+		l.breakDown = false
+		err := l.HandleBuy(marketData)
+		if err != nil {
+			logs.LogError(err)
+		}
+
+		l.TakeProfitPrice = linearMean
+		l.StopLossPrice = marketData.ClosePrice - ((linearMean - marketData.ClosePrice) / 2)
 
 		return
 	}
 
 }
 
-func (l *linearRegression) ProcessData(marketData *block.Data)  {
+func (l *linearRegression) ProcessData(marketData *block.Data) {
 	l.closePriceObservations = l.closePriceObservations[1:]
 	l.closePriceObservations = append(l.closePriceObservations, marketData.ClosePrice)
 
@@ -197,12 +178,10 @@ func (l *linearRegression) LastHigh() float64 {
 	return l.highPriceObservations[l.config.Period-1]
 }
 
-func (l *linearRegression) GetPotentialProfit(sell bool,targetPrice, currentPrice float64) float64 {
+func (l *linearRegression) GetPotentialProfit(sell bool, targetPrice, currentPrice float64) float64 {
 	if sell {
 		return (currentPrice / targetPrice) - 1
 	} else {
 		return (targetPrice / currentPrice) - 1
 	}
 }
-
-

@@ -1,6 +1,31 @@
 package indicators
 
-func Average(array []float64) float64  {
+const UpTrend = 1
+const DownTrend = 2
+const UnKnownTrend = 3
+
+func GetMovingAverageTrend(observations []float64, candles int) int {
+	ma := SimpleMA(observations, len(observations))
+	high := 0
+	low := 0
+	for _, price := range observations[len(observations)-candles:] {
+		if price > ma {
+			high++
+		} else {
+			low++
+		}
+	}
+
+	if high == candles {
+		return UpTrend
+	} else if low == candles {
+		return DownTrend
+	}
+
+	return UnKnownTrend
+}
+
+func Average(array []float64) float64 {
 
 	if len(array) == 0 {
 		return 0
@@ -11,10 +36,10 @@ func Average(array []float64) float64  {
 		sum += val
 	}
 
-	return sum/float64(len(array))
+	return sum / float64(len(array))
 }
 
-func SimpleMA(observations []float64, period int) float64  {
+func SimpleMA(observations []float64, period int) float64 {
 	if period > len(observations) {
 		return 0
 	}
@@ -22,17 +47,16 @@ func SimpleMA(observations []float64, period int) float64  {
 	length := len(observations)
 	sum := 0.
 
-	for i := length-1; i > length-1-period; i-- {
+	for i := length - 1; i > length-1-period; i-- {
 		sum += observations[i]
 	}
 
-	return sum/float64(period)
+	return sum / float64(period)
 }
 
-func ExponentialMA(period int, previousEMA, currentValue float64) float64  {
+func ExponentialMA(period int, previousEMA, currentValue float64) float64 {
 	multiplier := float64(2) / float64(period+1)
 
 	ema := currentValue*multiplier + previousEMA*(1-multiplier)
 	return ema
 }
-

@@ -33,7 +33,7 @@ func (t *TestingController) GetSessionsForUser(c *fiber.Ctx) error {
 
 	if withPermissions == "true" {
 		sessions, err = recording.GetSessionsForUserWithPermissions(t.GetDB(), userInfo.UserID)
-	} else  {
+	} else {
 		sessions, err = recording.GetAllSessionForUser(t.GetDB(), userInfo.UserID)
 	}
 
@@ -100,12 +100,26 @@ func (t *TestingController) DeleteCapture(c *fiber.Ctx) error {
 		return err
 	}
 
-	err = actions.DeleteCaptureSession(t.GetDB(), userinfo.UserID,captureSessionID)
+	err = actions.DeleteCaptureSession(t.GetDB(), userinfo.UserID, captureSessionID)
 	if err != nil {
 		return err
 	}
 
 	return c.SendStatus(http.StatusOK)
+}
+
+func (t *TestingController) GetSelectDataOptions(c *fiber.Ctx) error {
+	userinfo, err := t.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	capt, err := actions.GetUsersDataOptions(t.GetDB(), userinfo.UserID)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(capt)
 }
 
 func (t *TestingController) HandleWS(c *websocket.Conn) {
@@ -127,7 +141,6 @@ func (t *TestingController) HandleWS(c *websocket.Conn) {
 		ui := c.Locals("userInfo")
 		userInfo := ui.(*auth.Payload)
 
-
 		rawConfig, err := json.Marshal(&BTM.Config)
 		if err != nil {
 			logs.LogDebug("", err)
@@ -136,17 +149,17 @@ func (t *TestingController) HandleWS(c *websocket.Conn) {
 
 		//TODO: separate method for this db request
 		var sInfo apimodels.StrategyInfo
-		err = t.GetDB().Where("id = ?",BTM.StrategyID).Find(&sInfo).Error
+		err = t.GetDB().Where("id = ?", BTM.StrategyID).Find(&sInfo).Error
 		if err != nil {
 			return
 		}
 
-		trades, _, err := common.RunFunction(userInfo.UserID, rawConfig, testing.BackTest,BTM.StrategyID,sInfo.StrategyName, &BTM.CaptureID)
+		trades, _, err := common.RunFunction(userInfo.UserID, rawConfig, testing.BackTest, BTM.StrategyID, sInfo.StrategyName, &BTM.CaptureID)
 		if err != nil {
 			return
 		}
 
-		profit, winRate, roi := testing.GetProfitWinRateAndRoiForTrades(trades)
+		profit, winRate, roi, _ := testing.GetProfitWinRateAndRoiForTrades(trades)
 		tradesClosed := len(trades)
 
 		if tradesClosed > 200 {
@@ -154,29 +167,106 @@ func (t *TestingController) HandleWS(c *websocket.Conn) {
 		}
 
 		res := struct {
-			Profit float64 `json:"profit"`
-			WinRate float64 `json:"winRate"`
-			Roi float64 `json:"roi"`
-			TradesClosed int `json:"tradesClosed"`
-			Trades []*trade.Trade `json:"trades"`
+			Profit       float64        `json:"profit"`
+			WinRate      float64        `json:"winRate"`
+			Roi          float64        `json:"roi"`
+			TradesClosed int            `json:"tradesClosed"`
+			Trades       []*trade.Trade `json:"trades"`
 		}{
-			Profit: profit,
-			WinRate: winRate,
-			Roi: roi,
+			Profit:       profit,
+			WinRate:      winRate,
+			Roi:          roi,
 			TradesClosed: tradesClosed,
-			Trades: trades,
+			Trades:       trades,
 		}
 
-
 		resp := struct {
-			Data interface{} `json:"data"`
-			Status int `json:"status"`
+			Data   interface{} `json:"data"`
+			Status int         `json:"status"`
 		}{
-			Data: res,
+			Data:   res,
 			Status: http.StatusOK,
 		}
 
 		respBytes, err := json.Marshal(&resp)
+		if err != nil {
+			return
+		}
+
+		err = c.WriteMessage(websocket.TextMessage, respBytes)
+		if err != nil {
+			logs.LogDebug("", err)
+			return
+		}
+	}
+}
+
+func (t *TestingController) HandleWSv2(c *websocket.Conn) {
+	for {
+		_, msg, err := c.ReadMessage()
+		if err != nil {
+			logs.LogDebug("", err)
+			return
+		}
+
+		var model apimodels.MassBackTesting
+
+		err = json.Unmarshal(msg, &model)
+		if err != nil {
+			logs.LogDebug("", err)
+			return
+		}
+
+		ui := c.Locals("userInfo")
+		userInfo := ui.(*auth.Payload)
+
+		//testing.RunTestsForAll(t.GetDB(), BTM, userInfo)
+
+		// TODO : somehow rework this part of code to fit in separate method, currently it's causing import loop cycle
+
+		rawConfig, err := json.Marshal(&model.Config)
+		if err != nil {
+			logs.LogDebug("", err)
+			return
+		}
+
+		//TODO: separate method for this db request
+		var sInfo apimodels.StrategyInfo
+		err = t.GetDB().Where("id = ?", model.StrategyID).Find(&sInfo).Error
+		if err != nil {
+			logs.LogDebug("", err)
+			return
+		}
+
+		captures, err := actions.GetCaptures(t.GetDB(), model.Pair, model.TimeFrame, userInfo.UserID)
+		if err != nil {
+			logs.LogDebug("", err)
+			return
+		}
+
+		result := make([]*apimodels.BackTestingResult, 0)
+
+		for _, capture := range captures {
+			trades, _, err := common.RunFunction(userInfo.UserID, rawConfig, testing.BackTest, sInfo.ID, sInfo.StrategyName, &capture.ID)
+			if err != nil {
+				logs.LogDebug("", err)
+				return
+			}
+
+			result = append(result, &apimodels.BackTestingResult{
+				Trades:    trades,
+				Pair:      capture.Symbol,
+				TimeFrame: capture.TimeFrame,
+			})
+		}
+
+		metrics, err := testing.GetMetricsForTrades(result)
+		if err != nil {
+			logs.LogError(err)
+			return
+		}
+
+		respBytes, err := json.Marshal(&metrics)
 		if err != nil {
 			return
 		}

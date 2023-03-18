@@ -21,3 +21,16 @@ func Max(observations []float64) float64 {
 
 	return max
 }
+
+func Max32(observations []float32) (float32, int) {
+	max := float32(-999999999999999999999999999.)
+	maxIndex := 0
+	for i := range observations {
+		if observations[i] > max {
+			max = observations[i]
+			maxIndex = i
+		}
+	}
+
+	return max, maxIndex
+}
