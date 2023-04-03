@@ -64,14 +64,14 @@ func (m *Strategy) Execute() {
 
 				m.currentMarketData = marketData
 
+				if m.LastTrade != nil {
+					m.LastTrade.LengthCounter++
+				}
+
 				m.CalculateTradeData(marketData)
 				m.HandleStrategyDefinedStopLoss(marketData)
 
 				//marketData = m.ToHeikinAshi(marketData)
-
-				if m.LastTrade != nil {
-					m.LastTrade.LengthCounter++
-				}
 
 				if m.StopLossCondition() {
 					continue

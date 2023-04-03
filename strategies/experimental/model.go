@@ -13,6 +13,8 @@ import (
 	"newTradingBot/models/users"
 	"newTradingBot/strategies/common"
 	"strconv"
+	"sync"
+	"time"
 )
 
 type DF struct {
@@ -46,6 +48,9 @@ type experimentalContinuousStrategy struct {
 	buyersSellersRatio []float64
 
 	balance float64
+
+	mutex            sync.Mutex
+	bigVolumeCounter int
 }
 
 func NewContinuousExperimentalStrategy(config continuousConfig, keys *users.Keys, inst *instance.StrategyInstance) (strategy.Strategy, error) {
@@ -62,13 +67,13 @@ func NewContinuousExperimentalStrategy(config continuousConfig, keys *users.Keys
 	newStrategy.StrategyInstance = inst
 	newStrategy.ExperimentalHandler = newStrategy.Start
 
-	newStrategy.priceObservations = make([]float64, 400)
-	newStrategy.volumeObservations = make([]float64, 400)
+	newStrategy.priceObservations = make([]float64, 300)
+	newStrategy.volumeObservations = make([]float64, 300)
 
-	newStrategy.highVolumeOrders = make([]*DF, 50)
+	newStrategy.highVolumeOrders = make([]*DF, 60)
 
-	newStrategy.volumeRatio = make([]float64, 50)
-	newStrategy.buyersSellersRatio = make([]float64, 50)
+	newStrategy.volumeRatio = make([]float64, 60)
+	newStrategy.buyersSellersRatio = make([]float64, 60)
 
 	newStrategy.balance = 100
 
@@ -81,6 +86,10 @@ func (e *experimentalContinuousStrategy) Start() {
 		db, _ := database.GetDataBaseConnection()
 		_ = instance.UpdateStatus(db, e.StrategyInstance.ID, instance.StatusRunning)
 	}
+
+	go e.TradesPerFiveSeconds()
+
+	fmt.Printf("\n Run experimental for %s \n", e.config.Pair)
 
 	wsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
 		price, _ := strconv.ParseFloat(event.Price, 64)
@@ -98,7 +107,7 @@ func (e *experimentalContinuousStrategy) Start() {
 		quantityMean := indicators.Average(e.volumeObservations)
 		quantitySD := indicators.StandardDeviation(e.volumeObservations)
 
-		up := quantityMean + quantitySD*3
+		up := quantityMean + quantitySD*2
 
 		orderType := "LIMIT"
 		if !event.Maker {
@@ -120,6 +129,10 @@ func (e *experimentalContinuousStrategy) Start() {
 				Direction: direction,
 			})
 
+			e.mutex.Lock()
+			e.bigVolumeCounter++
+			e.mutex.Unlock()
+
 			if e.highVolumeOrders[0] != nil {
 				buyersVolume := 0.
 				sellersVolume := 0.
@@ -140,64 +153,67 @@ func (e *experimentalContinuousStrategy) Start() {
 				volumeRatio := buyersVolume / sellersVolume                        // more than 1 - more buyers volume
 				buyersSellersRatio := float64(buyersCount) / float64(sellersCount) //more than 1 - more buyers
 
+				e.mutex.Lock()
 				e.buyersSellersRatio = e.buyersSellersRatio[1:]
 				e.buyersSellersRatio = append(e.buyersSellersRatio, buyersSellersRatio)
 
 				e.volumeRatio = e.volumeRatio[1:]
 				e.volumeRatio = append(e.volumeRatio, volumeRatio)
+				e.mutex.Unlock()
 
-				if e.volumeRatio[0] != 0 {
-					meanVolumeRatio := indicators.Average(e.volumeRatio)
-					meanCountRatio := indicators.Average(e.buyersSellersRatio)
+				//if e.volumeRatio[0] != 0 {
+				//meanVolumeRatio := indicators.Average(e.volumeRatio)
+				//meanCountRatio := indicators.Average(e.buyersSellersRatio)
+				//
+				//vSD := indicators.StandardDeviation(e.volumeRatio)
+				//cSD := indicators.StandardDeviation(e.buyersSellersRatio)
 
-					vSD := indicators.StandardDeviation(e.volumeRatio)
-					cSD := indicators.StandardDeviation(e.buyersSellersRatio)
+				//upVolume := meanVolumeRatio + vSD*2.71828
+				//donwVolume := meanVolumeRatio - vSD*2.71828
+				//
+				//upCount := meanCountRatio + cSD*2.71828
+				//donwCount := meanCountRatio - cSD*2.71828
 
-					upVolume := meanVolumeRatio + vSD*3
-					donwVolume := meanVolumeRatio - vSD*3
+				if volumeRatio > 1.2 {
+					//buy
+					if e.trend != UP {
+						e.trend = UP
+						e.PrintData(price, volumeRatio, buyersSellersRatio)
 
-					upCount := meanCountRatio + cSD*3
-					donwCount := meanCountRatio - cSD*3
-
-					if volumeRatio > upVolume && buyersSellersRatio > upCount {
-						//buy
-						if e.trend != UP {
-							e.trend = UP
-							e.PrintData(price, volumeRatio, buyersSellersRatio)
-
-							e.CloseAllTrades()
-							err := e.HandleBuy(&block.Data{ClosePrice: price})
-							if err != nil {
-								logs.LogError(err)
-							}
-						}
-					} else if volumeRatio < donwVolume && buyersSellersRatio < donwCount {
-						//sell
-						if e.trend != DOWN {
-							e.trend = DOWN
-							e.PrintData(price, volumeRatio, buyersSellersRatio)
-
-							e.CloseAllTrades()
-							err := e.HandleSell(&block.Data{ClosePrice: price})
-							if err != nil {
-								logs.LogError(err)
-							}
+						e.CloseAllTrades()
+						err := e.HandleBuy(&block.Data{ClosePrice: price})
+						if err != nil {
+							logs.LogError(err)
 						}
 					}
-					//else {
-					//	conditionOne := e.trend == UP && volumeRatio < meanVolumeRatio && buyersSellersRatio < meanCountRatio
-					//	conditionTwo := e.trend == DOWN && volumeRatio > meanVolumeRatio && buyersSellersRatio > meanCountRatio
-					//	if conditionOne || conditionTwo {
-					//		e.CloseAllTrades()
-					//	}
-					//	if e.trend != NOTREND {
-					//		e.trend = NOTREND
-					//		e.PrintData(price, volumeRatio, buyersSellersRatio)
-					//		e.CloseAllTrades()
-					//	}
-					//}
+				} else if volumeRatio < 0.8 {
+					//sell
+					if e.trend != DOWN {
+						e.trend = DOWN
+						e.PrintData(price, volumeRatio, buyersSellersRatio)
 
+						e.CloseAllTrades()
+						err := e.HandleSell(&block.Data{ClosePrice: price})
+						if err != nil {
+							logs.LogError(err)
+						}
+					}
+				} else {
+					conditionOne := e.trend == UP && volumeRatio < 0.8
+					conditionTwo := e.trend == DOWN && volumeRatio > 1.2
+					if conditionOne || conditionTwo {
+						e.CloseAllTrades()
+						e.trend = NOTREND
+						e.PrintData(price, volumeRatio, buyersSellersRatio)
+					}
+					//if e.trend != NOTREND {
+					//	e.trend = NOTREND
+					//	e.PrintData(price, volumeRatio, buyersSellersRatio)
+					//	e.CloseAllTrades()
+					//}
 				}
+
+				//}
 
 				//if buyersVolume > sellersVolume && buyersCount > sellersCount {
 				//	// Buy trend
@@ -234,6 +250,34 @@ func (e *experimentalContinuousStrategy) PrintData(price, volume, count float64)
 	fmt.Printf("================== \n")
 	fmt.Printf("PRICE: %f TREND: %s \n Volume Ratio: %f Count Ratio: %f \n", price, e.trend, volume, count)
 	fmt.Printf("================== \n \n")
+}
+
+func (e *experimentalContinuousStrategy) TradesPerFiveSeconds() {
+	for {
+		select {
+		case <-e.StopSignal:
+			break
+		default:
+			tradesCount := 0
+
+			wsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
+				tradesCount++
+			}
+			_, stopC, _ := futures.WsAggTradeServe(e.config.Pair, wsAggTradeHandler, errHandlerLog)
+
+			time.Sleep(time.Second * 5)
+			stopC <- struct{}{}
+			fmt.Println("=========")
+			fmt.Println("Trades: ", tradesCount)
+			e.mutex.Lock()
+			fmt.Println("High Volume: ", e.bigVolumeCounter)
+			fmt.Println("V: ", e.volumeRatio[len(e.volumeRatio)-1])
+			fmt.Println("B: ", e.buyersSellersRatio[len(e.buyersSellersRatio)-1])
+			fmt.Println("=========")
+			e.bigVolumeCounter = 0
+			e.mutex.Unlock()
+		}
+	}
 }
 
 func (e *experimentalContinuousStrategy) Stop() {

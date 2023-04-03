@@ -12,12 +12,11 @@ func StartServer() (*fiber.App, error) {
 	app := fiber.New()
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "*",
-		AllowMethods:     "GET, PATCH, PUT, POST, DELETE, OPTIONS",
+		AllowMethods:     "GET, PATCH, PUT,HEAD, POST, DELETE, OPTIONS",
 		AllowCredentials: true,
 	}))
 
 	app.Static("/static", configuration.StaticFilesDir)
-
 	app.Use(recover.New())
 
 	establishRoutes(app)

@@ -125,7 +125,7 @@ func (l *linearRegression) Evaluate(marketData *block.Data, upLinear, lowLinear,
 
 	if upLinear > targetUp && l.breakUp {
 		profit := l.GetPotentialProfit(true, linearMean, targetUp)
-		if profit < 0.01 {
+		if profit < 0.025 {
 			return
 		}
 
@@ -141,7 +141,7 @@ func (l *linearRegression) Evaluate(marketData *block.Data, upLinear, lowLinear,
 		return
 	} else if lowLinear < targetDown && l.breakDown {
 		profit := l.GetPotentialProfit(true, linearMean, targetUp)
-		if profit < 0.01 {
+		if profit < 0.025 {
 			return
 		}
 
@@ -168,14 +168,6 @@ func (l *linearRegression) ProcessData(marketData *block.Data) {
 
 	l.lowPriceObservations = l.lowPriceObservations[1:]
 	l.lowPriceObservations = append(l.lowPriceObservations, marketData.Low)
-}
-
-func (l *linearRegression) LastLow() float64 {
-	return l.lowPriceObservations[l.config.Period-1]
-}
-
-func (l *linearRegression) LastHigh() float64 {
-	return l.highPriceObservations[l.config.Period-1]
 }
 
 func (l *linearRegression) GetPotentialProfit(sell bool, targetPrice, currentPrice float64) float64 {
