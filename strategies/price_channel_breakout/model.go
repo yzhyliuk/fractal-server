@@ -2,9 +2,8 @@ package price_channel_breakout
 
 import (
 	"encoding/json"
-	"github.com/adshao/go-binance/v2/futures"
+	"fmt"
 	"newTradingBot/api/database"
-	"newTradingBot/indicators"
 	"newTradingBot/logs"
 	"newTradingBot/models/account"
 	"newTradingBot/models/block"
@@ -22,11 +21,18 @@ type PriceChannelBreakout struct {
 
 	volumeObservations      []float64
 	priceChangeObservations []float64
+	trend                   string
 
 	config PriceChannelBreakoutConfig
 }
 
-const windowLength = 60
+const (
+	UP      = "UP"
+	DOWN    = "DOWN"
+	NOTREND = "FLAT"
+)
+
+const windowLength = 100
 
 // NewPriceChannelBreakoutStrategy - creates new Moving Average crossover strategy
 func NewPriceChannelBreakoutStrategy(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
@@ -70,54 +76,63 @@ func (m *PriceChannelBreakout) HandlerFunc(marketData *block.Data) {
 			_ = instance.UpdateStatus(db, m.StrategyInstance.ID, instance.StatusRunning)
 		}
 
-		if m.HandleTrade(marketData) {
-			return
-		}
+		// EXECUTION
 
-		// identify volume extreme values
-		volumeSD := indicators.StandardDeviation(m.volumeObservations)
-		priceChangeSD := indicators.StandardDeviation(m.priceChangeObservations)
+		volumeBuy := 0.
+		volumeSell := 0.
 
-		volumeMean := indicators.Average(m.priceChangeObservations)
-		priceChangeMean := indicators.Average(m.priceChangeObservations)
-
-		volumeUpLine := volumeMean + volumeSD*4
-		volumeDownLine := volumeMean - volumeSD*4
-
-		priceChangeUpLine := priceChangeMean + priceChangeSD*4
-		priceChangeDownLine := priceChangeMean - priceChangeSD*4
-
-		lastPriceChange := m.priceChangeObservations[windowLength-1]
-
-		// Enter Buy
-		if marketData.Volume > volumeUpLine && lastPriceChange > priceChangeUpLine {
-			err := m.HandleBuy(marketData)
-			if err != nil {
-				logs.LogError(err)
+		for idx := range m.volumeObservations {
+			if m.priceChangeObservations[idx] > 1 {
+				volumeBuy += m.volumeObservations[idx]
+			} else {
+				volumeSell += m.volumeObservations[idx]
 			}
 		}
 
-		// Enter Sell
-		if marketData.Volume < volumeDownLine && lastPriceChange < priceChangeDownLine {
-			err := m.HandleSell(marketData)
-			if err != nil {
-				logs.LogError(err)
+		volumeRatio := volumeBuy / volumeSell
+
+		if volumeRatio > 1.2 {
+			//buy
+			if m.trend != UP {
+				m.trend = UP
+				m.PrintData(marketData.ClosePrice, volumeRatio)
+
+				m.CloseAllTrades()
+				err := m.HandleBuy(marketData)
+				if err != nil {
+					logs.LogError(err)
+				}
+			}
+		} else if volumeRatio < 0.8 {
+			//sell
+			if m.trend != DOWN {
+				m.trend = DOWN
+				m.PrintData(marketData.ClosePrice, volumeRatio)
+
+				m.CloseAllTrades()
+				err := m.HandleSell(marketData)
+				if err != nil {
+					logs.LogError(err)
+				}
+			}
+		} else {
+			conditionOne := m.trend == UP && volumeRatio < 1
+			conditionTwo := m.trend == DOWN && volumeRatio > 1
+			if conditionOne || conditionTwo {
+				m.CloseAllTrades()
+				m.trend = NOTREND
+				m.PrintData(marketData.ClosePrice, volumeRatio)
 			}
 		}
-	}
-}
 
-func (m *PriceChannelBreakout) HandleTrade(data *block.Data) bool {
-	if m.LastTrade != nil {
-		//вольюмДикріс := m.volumeObservations[windowLength-2] < m.volumeObservations[windowLength-1]
-		if m.LastTrade.FuturesSide == futures.SideTypeBuy && m.priceChangeObservations[windowLength-1] < 1 {
-			m.CloseAllTrades()
-		} else if m.LastTrade.FuturesSide == futures.SideTypeSell && m.priceChangeObservations[windowLength-1] > 1 {
-			m.CloseAllTrades()
-		}
-		return true
+		// Print debug data
+
+		fmt.Println("Volume Ratio: ", volumeRatio)
+		fmt.Println("Trades Count: ", marketData.TradesCount)
+		fmt.Println("Volume: ", marketData.Volume)
+		fmt.Println("______________________")
+
 	}
-	return false
 }
 
 func (m *PriceChannelBreakout) ProcessData(marketData *block.Data) {
@@ -127,10 +142,7 @@ func (m *PriceChannelBreakout) ProcessData(marketData *block.Data) {
 	m.priceChangeObservations = m.priceChangeObservations[1:]
 	m.priceChangeObservations = append(m.priceChangeObservations, marketData.ClosePrice/marketData.OpenPrice)
 }
-func (l *PriceChannelBreakout) GetPotentialProfit(sell bool, targetPrice, currentPrice float64) float64 {
-	if sell {
-		return (currentPrice / targetPrice) - 1
-	} else {
-		return (targetPrice / currentPrice) - 1
-	}
+func (m *PriceChannelBreakout) PrintData(price, volume float64) {
+	fmt.Printf("================== \n")
+	fmt.Printf("PRICE: %f TREND: %s \n Volume Ratio: %f", price, m.trend, volume)
 }
