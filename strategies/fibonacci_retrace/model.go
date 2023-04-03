@@ -1,7 +1,10 @@
 package fibonacci_retrace
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/adshao/go-binance/v2/futures"
 	"newTradingBot/api/database"
 	"newTradingBot/indicators"
 	"newTradingBot/models/account"
@@ -11,6 +14,7 @@ import (
 	"newTradingBot/models/testing"
 	"newTradingBot/models/users"
 	"newTradingBot/strategies/common"
+	"strconv"
 )
 
 type FibonacciRetrace struct {
@@ -56,6 +60,7 @@ func NewBollingerBandsWithATR(monitorChannel chan *block.Data, configRaw []byte,
 	newStrategy.StrategyInstance = inst
 	newStrategy.HandlerFunction = newStrategy.HandlerFunc
 	newStrategy.DataProcessFunction = newStrategy.ProcessData
+	newStrategy.DataLoadEndpoint = newStrategy.LoadData
 
 	newStrategy.closePrice = make([]float64, config.MALength)
 	newStrategy.highPrice = make([]float64, 20)
@@ -96,6 +101,36 @@ func (f *FibonacciRetrace) HandlerFunc(marketData *block.Data) {
 			f.TakeProfitPrice = fibRetraceL
 		}
 	}
+}
+
+func (f *FibonacciRetrace) LoadData() error {
+	if f.StrategyInstance.Testing == testing.Disable {
+		client := futures.NewClient("", "")
+		tf := f.config.TimeFrame / 60
+		timeMark := "m"
+		interval := fmt.Sprintf("%d%s", tf, timeMark)
+
+		res, err := client.NewKlinesService().Symbol(f.config.Pair).Limit(f.config.MALength).Interval(interval).Do(context.Background())
+		if err != nil {
+			return err
+		}
+
+		for i := range res {
+			closePrice, _ := strconv.ParseFloat(res[i].Close, 64)
+			high, _ := strconv.ParseFloat(res[i].High, 64)
+			low, _ := strconv.ParseFloat(res[i].Low, 64)
+			md := &block.Data{
+				Symbol:     f.config.Pair,
+				ClosePrice: closePrice,
+				Low:        low,
+				High:       high,
+			}
+
+			f.ProcessData(md)
+		}
+	}
+
+	return nil
 }
 
 func (f *FibonacciRetrace) GetCurrentTrend(marketData *block.Data) string {

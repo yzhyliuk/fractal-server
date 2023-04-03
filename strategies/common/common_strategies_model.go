@@ -37,6 +37,7 @@ type Strategy struct {
 	Stopped             bool
 	HandlerFunction     func(marketData *block.Data)
 	DataProcessFunction func(marketData *block.Data)
+	DataLoadEndpoint    func() error
 	ExperimentalHandler func()
 
 	TakeProfitPrice float64
@@ -49,6 +50,12 @@ func (m *Strategy) Execute() {
 
 	if m.StrategyInstance.Testing != testing.BackTest {
 		m.LivePriceMonitoring()
+		if m.DataLoadEndpoint != nil {
+			err := m.DataLoadEndpoint()
+			if err != nil {
+				logs.LogError(err)
+			}
+		}
 	}
 
 	go func() {
