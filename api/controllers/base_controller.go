@@ -13,7 +13,6 @@ import (
 )
 
 type BaseController struct {
-
 }
 
 func (b *BaseController) GetDB() *gorm.DB {
@@ -46,9 +45,9 @@ func (b *BaseController) GetFilteredDB(c *fiber.Ctx) *gorm.DB {
 	for _, param := range params {
 		keyValue := strings.Split(param, "=")
 		key := keyValue[0]
-		//if key == helpers.Pagination ||
-		//	key == helpers.ItemsPerPage ||
-		//	key == helpers.CurrentPage {
+		//if key == helpers.go.Pagination ||
+		//	key == helpers.go.ItemsPerPage ||
+		//	key == helpers.go.CurrentPage {
 		//	continue
 		//}
 		query[key] = c.Query(key)
@@ -58,7 +57,7 @@ func (b *BaseController) GetFilteredDB(c *fiber.Ctx) *gorm.DB {
 
 	for key, value := range query {
 		if value == "true" || value == "false" {
-			db = db.Where(fmt.Sprintf("%s = %s",key, value))
+			db = db.Where(fmt.Sprintf("%s = %s", key, value))
 			continue
 		}
 		_, err := strconv.Atoi(value)

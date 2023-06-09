@@ -39,6 +39,16 @@ func Average(array []float64) float64 {
 	return sum / float64(len(array))
 }
 
+func Sum(array []float64) float64 {
+	sum := 0.
+
+	for _, v := range array {
+		sum += v
+	}
+
+	return sum
+}
+
 func SimpleMA(observations []float64, period int) float64 {
 	if period > len(observations) {
 		return 0

@@ -29,9 +29,8 @@ func GetProfitWinRateAndRoiForTrades(trades []*trade.Trade) (profit, winRate, ro
 		}
 	}
 
-	if trades[0].IsFutures {
-		roi = profit / (trades[0].USD / float64(*trades[0].Leverage))
-	}
+	roi = profit / (trades[0].USD / float64(*trades[0].Leverage))
+
 	winRate = float64(winTradeCounter) / float64(len(trades))
 
 	averageTradeLength = float64(totalTradeLength) / float64(len(trades))

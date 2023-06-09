@@ -9,7 +9,7 @@ import (
 )
 
 func StartCapture(recordSession *recording.CapturedSession) error {
-	newCaptureMonitor := monitoring.NewBinanceMonitor(recordSession.Symbol, time.Second*time.Duration(recordSession.TimeFrame), recordSession.IsFutures)
+	newCaptureMonitor := monitoring.NewBinanceMonitor(recordSession.Symbol, time.Second*time.Duration(recordSession.TimeFrame))
 	monitorName := recordSession.GetMonitorName()
 	var inputChan chan *block.Data
 

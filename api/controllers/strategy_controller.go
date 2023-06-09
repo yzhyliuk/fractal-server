@@ -45,14 +45,12 @@ func (s *StrategyController) GetStrategyFields(c *fiber.Ctx) error {
 		return err
 	}
 
-	isFutures := c.Query("type") == FuturesType
-
-	fields, err := apimodels.GetStrategyFields(s.GetDB(), id, isFutures)
+	fields, err := apimodels.GetStrategyFields(s.GetDB(), id)
 	if err != nil {
 		return err
 	}
 
-	defaultFields, err := apimodels.GetDefaultFields(s.GetDB(), isFutures)
+	defaultFields, err := apimodels.GetDefaultFields(s.GetDB())
 	if err != nil {
 		return err
 	}

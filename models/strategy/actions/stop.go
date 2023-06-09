@@ -14,7 +14,7 @@ func StopStrategy(db *gorm.DB, inst *instance.StrategyInstance) error {
 	db.Where("id = ?", inst.StrategyID).Find(&info)
 
 	if !info.IsContinuous {
-		monitorName := fmt.Sprintf("%s:%d:%t",inst.Pair, inst.TimeFrame, inst.IsFutures)
+		monitorName := fmt.Sprintf("%s:%d", inst.Pair, inst.TimeFrame)
 
 		storage.MonitorsBinance[monitorName].UnSubscribe(inst.ID)
 
@@ -29,4 +29,3 @@ func StopStrategy(db *gorm.DB, inst *instance.StrategyInstance) error {
 
 	return nil
 }
-

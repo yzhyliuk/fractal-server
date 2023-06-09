@@ -13,18 +13,17 @@ import (
 )
 
 type BinanceMonitor struct {
-	symbol string
+	symbol            string
 	timeFrameDuration time.Duration
-	client *binance.Client
-	pause bool
-	stopSignal chan bool
-	subscribers map[int]chan *block2.Data
-	isFutures bool
-	mtx sync.Mutex
-	prevMarketData *block2.Data
+	client            *binance.Client
+	pause             bool
+	stopSignal        chan bool
+	subscribers       map[int]chan *block2.Data
+	mtx               sync.Mutex
+	prevMarketData    *block2.Data
 }
 
-func NewBinanceMonitor(symbol string, timeFrameDuration time.Duration, isFutures bool) *BinanceMonitor  {
+func NewBinanceMonitor(symbol string, timeFrameDuration time.Duration) *BinanceMonitor {
 	var binMonitor BinanceMonitor
 	binMonitor.timeFrameDuration = timeFrameDuration
 	binMonitor.symbol = symbol
@@ -33,7 +32,6 @@ func NewBinanceMonitor(symbol string, timeFrameDuration time.Duration, isFutures
 
 	binMonitor.stopSignal = make(chan bool)
 	binMonitor.subscribers = make(map[int]chan *block2.Data)
-	binMonitor.isFutures = isFutures
 
 	return &binMonitor
 }
@@ -57,7 +55,7 @@ func (m *BinanceMonitor) IsEmptySubs() bool {
 }
 
 // NotifyAll - send data to all existent subscribers
-func (m *BinanceMonitor) NotifyAll(marketData block2.Data)  {
+func (m *BinanceMonitor) NotifyAll(marketData block2.Data) {
 	logs.LogDebug("Start notify all instances for binance monitor", nil)
 	m.mtx.Lock()
 	for _, channel := range m.subscribers {
@@ -66,18 +64,14 @@ func (m *BinanceMonitor) NotifyAll(marketData block2.Data)  {
 	m.mtx.Unlock()
 }
 
-func (m *BinanceMonitor) IsFutures() bool  {
-	return m.isFutures
-}
-
 // Stop - stops binance market monitor
-func (m *BinanceMonitor) Stop()  {
+func (m *BinanceMonitor) Stop() {
 	m.stopSignal <- true
 	logs.LogDebug(fmt.Sprintf("Binance monitor is STOPPED for %s with %d min. time frame", m.symbol, int(m.timeFrameDuration/time.Minute)), nil)
 }
 
 // RunMonitor - starts monitoring loop
-func (m *BinanceMonitor) RunMonitor()  {
+func (m *BinanceMonitor) RunMonitor() {
 	logs.LogDebug(fmt.Sprintf("Binance monitor is RUNNING for %s with %d min. time frame", m.symbol, int(m.timeFrameDuration/time.Minute)), nil)
 	go func() {
 		for {
@@ -95,49 +89,25 @@ func (m *BinanceMonitor) RunMonitor()  {
 
 				stopC := make(chan struct{})
 
-				if !m.isFutures {
-					wsAggTradeHandler := func(event *binance.WsAggTradeEvent) {
+				wsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
+					m.mtx.Lock()
+					price, _ := strconv.ParseFloat(event.Price, 64)
+					block.TradesArray = append(block.TradesArray, price)
+					block.TradesCount++
 
-						price, _ := strconv.ParseFloat(event.Price, 64)
-						m.mtx.Lock()
-						block.TradesArray = append(block.TradesArray, price)
-						block.TradesCount++
+					quantity, _ := strconv.ParseFloat(event.Quantity, 64)
+					block.Volume += quantity
 
-						quantity, _ := strconv.ParseFloat(event.Quantity, 64)
-						block.Volume += quantity
-
-						if price > block.High {
-							block.High = price
-						}
-						if price < block.Low {
-							block.Low = price
-						}
-
-						m.mtx.Unlock()
+					if price > block.High {
+						block.High = price
 					}
-
-					_, stopC, _ = binance.WsAggTradeServe(m.symbol, wsAggTradeHandler, errHandlerLog)
-				} else {
-					wsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
-						m.mtx.Lock()
-						price, _ := strconv.ParseFloat(event.Price, 64)
-						block.TradesArray = append(block.TradesArray, price)
-						block.TradesCount++
-
-						quantity, _ := strconv.ParseFloat(event.Quantity, 64)
-						block.Volume += quantity
-
-						if price > block.High {
-							block.High = price
-						}
-						if price < block.Low {
-							block.Low = price
-						}
-						m.mtx.Unlock()
+					if price < block.Low {
+						block.Low = price
 					}
-
-					_, stopC, _ = futures.WsAggTradeServe(m.symbol, wsAggTradeHandler, errHandlerLog)
+					m.mtx.Unlock()
 				}
+
+				_, stopC, _ = futures.WsAggTradeServe(m.symbol, wsAggTradeHandler, errHandlerLog)
 
 				time.Sleep(m.timeFrameDuration)
 				stopC <- struct{}{}
@@ -151,7 +121,7 @@ func (m *BinanceMonitor) RunMonitor()  {
 					for i := range block.TradesArray {
 						sum += block.TradesArray[i]
 					}
-					block.AveragePrice = sum/float64(block.TradesCount)
+					block.AveragePrice = sum / float64(block.TradesCount)
 					m.mtx.Unlock()
 
 					go m.NotifyAll(*block)

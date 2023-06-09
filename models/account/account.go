@@ -32,50 +32,50 @@ type TakeProfit struct {
 }
 
 type AssetPrecision struct {
-	Price int
+	Price    int
 	Quantity int
 }
 
 type BinanceAccount struct {
-	apiKey string
+	apiKey    string
 	secretKey string
 
 	userID int
 
-	client *binance.Client
+	client        *binance.Client
 	futuresClient *futures.Client
 
-	precision map[string]AssetPrecision
+	precision        map[string]AssetPrecision
 	precisionFutures map[string]AssetPrecision
 }
 
 // NewBinanceAccount returns new entity of binance account for given keys
 func NewBinanceAccount(apiKey, secretKey, futuresApiKey, futuresSecretKey string) (Account, error) {
 	nba := &BinanceAccount{
-		apiKey: apiKey,
+		apiKey:    apiKey,
 		secretKey: secretKey,
 	}
 
 	var err error
 
 	// get new client cor account
-	nba.client = binance.NewClient(apiKey,secretKey)
-	nba.futuresClient = futures.NewClient(futuresApiKey,futuresSecretKey)
+	nba.client = binance.NewClient(apiKey, secretKey)
+	nba.futuresClient = futures.NewClient(futuresApiKey, futuresSecretKey)
 
 	// load precision for all trading symbols
 	nba.precision, err = nba.getPrecisionMap()
-	if err !=nil {
+	if err != nil {
 		return nil, err
 	}
 	nba.precisionFutures, err = nba.getFuturesPrecisionMap()
-	if err !=nil {
+	if err != nil {
 		return nil, err
 	}
 
 	return nba, nil
 }
 
-func (b *BinanceAccount) GetCurrentQuote(symbol string) (float64, error)  {
+func (b *BinanceAccount) GetCurrentQuote(symbol string) (float64, error) {
 	v, err := b.futuresClient.NewListPricesService().Symbol(symbol).Do(context.Background())
 	if err != nil {
 		return 0, err
@@ -118,7 +118,7 @@ func (b *BinanceAccount) PlaceMarketOrder(sum float64, symbol string, side binan
 		count++
 	}
 
-	price = price/float64(count)
+	price = price / float64(count)
 
 	quantityFloat, _ := strconv.ParseFloat(quantity, 64)
 
@@ -133,8 +133,7 @@ func (b *BinanceAccount) PlaceMarketOrder(sum float64, symbol string, side binan
 			UserID:     inst.UserID,
 			StrategyID: inst.StrategyID,
 			Pair:       symbol,
-			USD:        quantityFloat*price,
-			IsFutures:  false,
+			USD:        quantityFloat * price,
 			PriceOpen:  price,
 			Quantity:   quantityFloat,
 			TimeStamp:  time.Now(),
@@ -148,12 +147,12 @@ func (b *BinanceAccount) PlaceMarketOrder(sum float64, symbol string, side binan
 		spotTrade = prevTrade
 		spotTrade.PriceClose = price
 		spotTrade.Status = trade.StatusClosed
-		spotTrade.Profit = (spotTrade.Quantity*price)-spotTrade.USD
-		spotTrade.ROI = spotTrade.Profit/spotTrade.USD
+		spotTrade.Profit = (spotTrade.Quantity * price) - spotTrade.USD
+		spotTrade.ROI = spotTrade.Profit / spotTrade.USD
 
 		err = trade.CloseTrade(db, spotTrade)
 		if err != nil {
-			return nil,err
+			return nil, err
 		}
 	}
 
@@ -189,7 +188,7 @@ func (b *BinanceAccount) OpenFuturesPosition(amount float64, symbol string, side
 	for order == nil {
 		order, _ = b.futuresClient.NewGetOrderService().Symbol(symbol).OrderID(orderID).Do(context.Background())
 		if err != nil {
-			time.Sleep(10*time.Second)
+			time.Sleep(10 * time.Second)
 		}
 	}
 
@@ -201,19 +200,18 @@ func (b *BinanceAccount) OpenFuturesPosition(amount float64, symbol string, side
 	}
 
 	futuresTrade = &trade.Trade{
-		InstanceID: inst.ID,
-		UserID: inst.UserID,
-		StrategyID: inst.StrategyID,
+		InstanceID:     inst.ID,
+		UserID:         inst.UserID,
+		StrategyID:     inst.StrategyID,
 		Pair:           symbol,
-		USD:            amount*price,
-		IsFutures:      true,
+		USD:            amount * price,
 		PriceOpen:      price,
 		Quantity:       amount,
 		TimeStamp:      time.Now(),
 		Status:         trade.StatusActive,
 		FuturesSide:    side,
 		BinanceOrderID: orderID,
-		Leverage: inst.Leverage,
+		Leverage:       inst.Leverage,
 	}
 
 	db, err := database.GetDataBaseConnection()
@@ -230,7 +228,7 @@ func (b *BinanceAccount) OpenFuturesPosition(amount float64, symbol string, side
 }
 
 func (b *BinanceAccount) OpenNewTakeProfitOrder(takeProfit TakeProfit, symbol string, side futures.SideType) (*futures.CreateOrderResponse, error) {
-	price := b.formatPrice(takeProfit.Price ,symbol)
+	price := b.formatPrice(takeProfit.Price, symbol)
 	quantity := b.formatQuantity(takeProfit.Sum, symbol, true)
 	return b.futuresClient.NewCreateOrderService().ReduceOnly(true).TimeInForce(futures.TimeInForceTypeGTC).StopPrice(price).Quantity(quantity).Symbol(symbol).Side(side).Type(futures.OrderTypeTakeProfitMarket).Do(context.Background())
 }
@@ -252,12 +250,11 @@ func (b *BinanceAccount) CloseFuturesPosition(futuresTrade *trade.Trade) (*trade
 	for order == nil {
 		order, err = b.futuresClient.NewGetOrderService().Symbol(futuresTrade.Pair).OrderID(res.OrderID).Do(context.Background())
 		if err != nil {
-			time.Sleep(5*time.Second)
+			time.Sleep(5 * time.Second)
 		} else {
 			break
 		}
 	}
-
 
 	price, err := strconv.ParseFloat(order.AvgPrice, 64)
 	if err != nil {
@@ -266,16 +263,16 @@ func (b *BinanceAccount) CloseFuturesPosition(futuresTrade *trade.Trade) (*trade
 
 	roi := 0.
 	profit := 0.
-	fee := futuresTrade.USD*BinanceFuturesTakerFeeRate
+	fee := futuresTrade.USD * BinanceFuturesTakerFeeRate
 
 	switch futuresTrade.FuturesSide {
 	case futures.SideTypeBuy:
-		profit = (futuresTrade.Quantity*price)-futuresTrade.USD
+		profit = (futuresTrade.Quantity * price) - futuresTrade.USD
 	case futures.SideTypeSell:
-		profit = (futuresTrade.Quantity*futuresTrade.PriceOpen)-(futuresTrade.Quantity*price)
+		profit = (futuresTrade.Quantity * futuresTrade.PriceOpen) - (futuresTrade.Quantity * price)
 	}
 
-	profit -= 2*fee
+	profit -= 2 * fee
 
 	roi = profit / (futuresTrade.USD / float64(*futuresTrade.Leverage))
 
@@ -308,7 +305,8 @@ func (b *BinanceAccount) formatQuantity(sum float64, symbol string, isFutures bo
 	if isFutures {
 		return fmt.Sprintf("%.*f", b.precisionFutures[symbol].Quantity, sum)
 	} else {
-		return fmt.Sprintf("%.*f", b.precision[symbol].Quantity, sum)
+		q := b.precision[symbol].Quantity
+		return fmt.Sprintf("%.*f", q, sum)
 	}
 }
 
@@ -316,7 +314,6 @@ func (b *BinanceAccount) formatPrice(price float64, symbol string) string {
 	return fmt.Sprintf("%.*f", b.precisionFutures[symbol].Price, price)
 }
 
-func QuantityFromPrice(bidSize, price float64 ) float64 {
-	return bidSize/price
+func QuantityFromPrice(bidSize, price float64) float64 {
+	return bidSize / price
 }
-

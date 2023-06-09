@@ -39,33 +39,29 @@ func CloseAllTrades(db *gorm.DB) error {
 			continue
 		}
 
-		acc, err := account.NewBinanceAccount(userKeys.ApiKey, userKeys.SecretKey,userKeys.ApiKey, userKeys.SecretKey)
+		acc, err := account.NewBinanceAccount(userKeys.ApiKey, userKeys.SecretKey, userKeys.ApiKey, userKeys.SecretKey)
 
-		if t.IsFutures {
-			res, err := acc.GetOpenedFuturesTrades(t.Pair, t.TimeStamp)
+		res, err := acc.GetOpenedFuturesTrades(t.Pair, t.TimeStamp)
+		if err != nil {
+			logs.LogError(err)
+			continue
+		}
+
+		for _, order := range res {
+			entryPrice, err := strconv.ParseFloat(order.EntryPrice, 64)
 			if err != nil {
-				logs.LogError(err)
 				continue
 			}
 
-			for _, order := range res {
-				entryPrice, err := strconv.ParseFloat(order.EntryPrice, 64)
+			if t.PriceOpen == entryPrice {
+				_, err := acc.CloseFuturesPosition(&t)
 				if err != nil {
+					// TODO : notify user about close
+					logs.LogError(err)
 					continue
-				}
-
-				if t.PriceOpen == entryPrice {
-					_, err := acc.CloseFuturesPosition(&t)
-					if err != nil {
-						// TODO : notify user about close
-						logs.LogError(err)
-						continue
-					}
 				}
 			}
 		}
-
 	}
-
 	return nil
 }
