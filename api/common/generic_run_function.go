@@ -13,16 +13,12 @@ import (
 	"newTradingBot/models/users"
 	"newTradingBot/storage"
 	"newTradingBot/strategies/fibonacci_retrace"
-	"newTradingBot/strategies/price_channel_breakout"
-	"newTradingBot/strategies/regression_channels"
-	"newTradingBot/strategies/tech_analysis"
+	"newTradingBot/strategies/levels"
 )
 
 var NewStrategy = map[string]func(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error){
-	regression_channels.StrategyName:    regression_channels.NewLinearRegression,
-	price_channel_breakout.StrategyName: price_channel_breakout.NewPriceChannelBreakoutStrategy,
-	fibonacci_retrace.StrategyName:      fibonacci_retrace.NewBollingerBandsWithATR,
-	tech_analysis.StrategyName:          tech_analysis.NewAdvancedTechAnalysis,
+	fibonacci_retrace.StrategyName: fibonacci_retrace.NewFibonacciRetrace,
+	levels.StrategyName:            levels.NewLevels,
 }
 
 func RunFunction(userID int, rawConfig []byte, test, strategyID int, strategyName string, sessionID *int) ([]*trade.Trade, *int, error) {

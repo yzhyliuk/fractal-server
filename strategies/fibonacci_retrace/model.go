@@ -3,6 +3,7 @@ package fibonacci_retrace
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/adshao/go-binance/v2/futures"
 	"newTradingBot/api/database"
@@ -25,6 +26,7 @@ type FibonacciRetrace struct {
 	lowPrice   []float64
 	highPrice  []float64
 	closePrice []float64
+	volume     []float64
 
 	trendBarsCounter int
 	prevTrend        string
@@ -35,14 +37,21 @@ const UpTrend = "UP"
 const DownTrend = "Down"
 const NoTrend = "Flat"
 
-// NewBollingerBandsWithATR - creates new Moving Average crossover strategy
-func NewBollingerBandsWithATR(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
+// NewFibonacciRetrace - creates new FibonacciRetrace crossover strategy
+func NewFibonacciRetrace(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
 
 	var config FibonacciRetraceConfig
 
 	err := json.Unmarshal(configRaw, &config)
 	if err != nil {
 		return nil, err
+	}
+
+	// Validation
+	if config.MALength <= config.BBLength {
+		return nil, errors.New("length of MA parameter should be greater than BB length")
+	} else if config.MALength > 500 {
+		return nil, errors.New("maximum length of MA parameter is 500")
 	}
 
 	acc, err := account.NewBinanceAccount(keys.ApiKey, keys.SecretKey, keys.ApiKey, keys.SecretKey)
@@ -64,6 +73,7 @@ func NewBollingerBandsWithATR(monitorChannel chan *block.Data, configRaw []byte,
 	newStrategy.closePrice = make([]float64, config.MALength)
 	newStrategy.highPrice = make([]float64, 20)
 	newStrategy.lowPrice = make([]float64, 20)
+	newStrategy.volume = make([]float64, config.BBLength)
 
 	return newStrategy, nil
 }
@@ -105,14 +115,22 @@ func (f *FibonacciRetrace) HandlerFunc(marketData *block.Data) {
 			}
 			f.TakeProfitPrice = fibRetraceL
 		}
+	}
+}
 
-		if f.LastTrade != nil {
-			condOne := f.LastTrade.FuturesSide == futures.SideTypeSell && trend == UpTrend
-			condTwo := f.LastTrade.FuturesSide == futures.SideTypeBuy && trend == DownTrend
-
-			if condTwo || condOne {
-				f.CloseAllTrades()
-			}
+func (f *FibonacciRetrace) TrailingStopLoss(marketData *block.Data) {
+	index := len(f.closePrice) - 1
+	closePrice := marketData.ClosePrice
+	prevClosePrice := f.closePrice[index-1]
+	if f.LastTrade.FuturesSide == futures.SideTypeBuy {
+		if closePrice > prevClosePrice {
+			delta := closePrice - prevClosePrice
+			f.StopLossPrice = f.StopLossPrice + delta
+		}
+	} else if f.LastTrade.FuturesSide == futures.SideTypeSell {
+		if closePrice < prevClosePrice {
+			delta := prevClosePrice - closePrice
+			f.StopLossPrice = f.StopLossPrice + delta
 		}
 	}
 }

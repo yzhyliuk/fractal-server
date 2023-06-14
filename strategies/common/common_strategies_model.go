@@ -8,6 +8,7 @@ import (
 	"newTradingBot/models/strategy/instance"
 	"newTradingBot/models/testing"
 	"newTradingBot/models/trade"
+	"sync"
 	"time"
 )
 
@@ -32,6 +33,7 @@ type Strategy struct {
 
 	TakeProfitPrice float64
 	StopLossPrice   float64
+	Mutex           sync.Mutex
 }
 
 func (s *Strategy) Execute() {
@@ -123,6 +125,14 @@ func (s *Strategy) ChangeBid(bid float64) error {
 	}
 
 	return db.Save(s.StrategyInstance).Error
+}
+
+func (s *Strategy) CloseTrade() {
+	s.Mutex.Lock()
+	if s.LastTrade != nil {
+		s.CloseAllTrades()
+	}
+	s.Mutex.Unlock()
 }
 
 // ExecuteExperimental - runs experimental handler

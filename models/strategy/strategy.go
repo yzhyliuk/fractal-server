@@ -15,11 +15,12 @@ type Strategy interface {
 	ExecuteExperimental()
 	GetTestingTrades() []*trade.Trade
 	ChangeBid(bid float64) error
+	CloseTrade()
 }
 
 type HandlerFunc func(block *block.Data, orderSpot *binance.CreateOrderResponse, orderFutures *futures.CreateOrderResponse, err error)
 
 type Settings struct {
 	BaseBid float64
-	Symbol string
+	Symbol  string
 }

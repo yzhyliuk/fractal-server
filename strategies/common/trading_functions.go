@@ -10,6 +10,8 @@ import (
 
 // CloseAllTrades - terminates all opened trades for current strategy
 func (s *Strategy) CloseAllTrades() {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
 	if s.StrategyInstance.Testing == testing.BackTest {
 		s.TestingCloseTrade(s.currentMarketData)
 	}
@@ -35,6 +37,8 @@ func (s *Strategy) HandleBuy(marketData *block.Data) error {
 }
 
 func (s *Strategy) handleOpenTrade(marketData *block.Data, side futures.SideType) error {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
 	// there is no need to open a new trade with the same side
 	if s.LastTrade != nil && s.LastTrade.FuturesSide == side {
 		return nil
@@ -72,6 +76,8 @@ func (s *Strategy) handleOpenTrade(marketData *block.Data, side futures.SideType
 
 // CalculateTradeData - calculates max and min price values for given trade
 func (s *Strategy) CalculateTradeData(marketData *block.Data) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
 	if s.LastTrade != nil {
 		s.LastTrade.LengthCounter++
 		profit := 0.

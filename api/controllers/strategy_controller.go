@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	errors2 "errors"
 	"github.com/gofiber/fiber/v2"
 	"net/http"
 	"newTradingBot/api/common"
@@ -406,10 +407,55 @@ func (s *StrategyController) ChangeConfig(c *fiber.Ctx) error {
 		return err
 	}
 
+	insts := &instance.StrategyInstance{
+		ID: cfg.InstanceID,
+	}
+	err = s.GetDB().Find(insts).Error
+	if err != nil {
+		return err
+	}
+
+	userInfo, err := s.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	if insts.UserID != userInfo.UserID {
+		return errors2.New("you don't have permission to perform this action")
+	}
+
 	err = storage.StrategiesStorage[cfg.InstanceID].ChangeBid(cfg.Bid)
 	if err != nil {
 		return err
 	}
+
+	return c.SendStatus(http.StatusOK)
+}
+
+func (s *StrategyController) CloseCurrentTrade(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return err
+	}
+
+	insts := &instance.StrategyInstance{
+		ID: id,
+	}
+	err = s.GetDB().Find(insts).Error
+	if err != nil {
+		return err
+	}
+
+	userInfo, err := s.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	if insts.UserID != userInfo.UserID {
+		return errors2.New("you don't have permission to perform this action")
+	}
+
+	storage.StrategiesStorage[id].CloseTrade()
 
 	return c.SendStatus(http.StatusOK)
 }
