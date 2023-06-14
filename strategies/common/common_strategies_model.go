@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"newTradingBot/api/database"
 	"newTradingBot/logs"
 	"newTradingBot/models/account"
@@ -8,7 +9,6 @@ import (
 	"newTradingBot/models/strategy/instance"
 	"newTradingBot/models/testing"
 	"newTradingBot/models/trade"
-	"sync"
 	"time"
 )
 
@@ -33,7 +33,6 @@ type Strategy struct {
 
 	TakeProfitPrice float64
 	StopLossPrice   float64
-	Mutex           sync.Mutex
 }
 
 func (s *Strategy) Execute() {
@@ -92,7 +91,7 @@ func (s *Strategy) Execute() {
 				s.DataProcessFunction(marketData)
 				s.HandlerFunction(marketData)
 
-				//logs.LogDebug(fmt.Sprintf("Data received by instance #%d", s.StrategyInstance.ID), nil)
+				logs.LogDebug(fmt.Sprintf("Data received by instance #%d", s.StrategyInstance.ID), nil)
 				if s.StrategyInstance.Testing != testing.BackTest {
 					s.UpdateLastPingTime()
 				}
@@ -128,11 +127,9 @@ func (s *Strategy) ChangeBid(bid float64) error {
 }
 
 func (s *Strategy) CloseTrade() {
-	s.Mutex.Lock()
 	if s.LastTrade != nil {
 		s.CloseAllTrades()
 	}
-	s.Mutex.Unlock()
 }
 
 // ExecuteExperimental - runs experimental handler

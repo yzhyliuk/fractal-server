@@ -132,14 +132,12 @@ func (s *Strategy) CalculateStopLossPrice(priceCurrent float64, sell bool) float
 func (s *Strategy) LivePriceMonitoring() {
 	go func() {
 		for {
-			s.Mutex.Lock()
 			if s.Stopped {
 				break
 			} else if s.LastTrade == nil {
 				time.Sleep(10 * time.Second)
 				continue
 			}
-			s.Mutex.Unlock()
 
 			lowPrice := lowPriceDefault
 			highPrice := maxPriceDefault
@@ -162,7 +160,6 @@ func (s *Strategy) LivePriceMonitoring() {
 
 			shouldClose := false
 
-			s.Mutex.Lock()
 			if s.LastTrade != nil && (lowPrice != lowPriceDefault && highPrice != maxPriceDefault) {
 				if s.StopLossPrice != 0 {
 					switch s.LastTrade.FuturesSide {
@@ -189,7 +186,6 @@ func (s *Strategy) LivePriceMonitoring() {
 					}
 				}
 			}
-			s.Mutex.Unlock()
 
 			if shouldClose {
 				s.CloseAllTrades()
