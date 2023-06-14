@@ -4,6 +4,7 @@ import (
 	"gorm.io/gorm"
 	"newTradingBot/api/helpers"
 	"newTradingBot/models/strategy/configs"
+	"time"
 )
 
 const StrategyInstancesTableName = "strategy_instances"
@@ -13,53 +14,69 @@ const StrategyInstanceConfigTableName = "instance_config"
 const StatusRunning = "running"
 const StatusCreated = "created"
 const StatusStopped = "stopped"
+const StatusRestarting = "restarting"
+
+const StatusAlive = "alive"
+const StatusNotResponding = "not_responding"
 
 // StrategyInstance - represents running instance of strategy
 type StrategyInstance struct {
-	ID int `json:"id" gorm:"column:id"`
-	StrategyID int `json:"strategyId" gorm:"column:strategy_id"`
-	UserID int `json:"userId" gorm:"column:user_id"`
-	Pair string `json:"pair" gorm:"column:pair"`
-	Bid float64 `json:"bid" gorm:"column:bid"`
-	TimeFrame int `json:"timeFrame" gorm:"column:time_frame"`
-	Status string `json:"status" gorm:"column:status"`
-	IsFutures bool `json:"isFutures" gorm:"column:is_futures"`
-	Leverage *int `json:"leverage" gorm:"column:leverage"`
-	StopLoss float64 `json:"stopLoss" gorm:"-"`
-	TradeStopLoss float64 `json:"tradeStopLoss" gorm:"-"`
-	TradeTakeProfit float64 `json:"tradeTakeProfit" gorm:"-"`
-	Archived bool `json:"archived" gorm:"archived"`
+	ID         int     `json:"id" gorm:"column:id"`
+	StrategyID int     `json:"strategyId" gorm:"column:strategy_id"`
+	UserID     int     `json:"userId" gorm:"column:user_id"`
+	Pair       string  `json:"pair" gorm:"column:pair"`
+	Bid        float64 `json:"bid" gorm:"column:bid"`
+	TimeFrame  int     `json:"timeFrame" gorm:"column:time_frame"`
+	Status     string  `json:"status" gorm:"column:status"`
+	//IsFutures bool `json:"isFutures" gorm:"column:is_futures"`
+	Leverage        *int      `json:"leverage" gorm:"column:leverage"`
+	StopLoss        float64   `json:"stopLoss" gorm:"-"`
+	TradeStopLoss   float64   `json:"tradeStopLoss" gorm:"-"`
+	TradeTakeProfit float64   `json:"tradeTakeProfit" gorm:"-"`
+	Archived        bool      `json:"archived" gorm:"archived"`
+	AliveStatus     string    `json:"aliveStatus" gorm:"-"`
+	LastPingTime    time.Time `json:"-" gorm:"last_ping_time"`
 
 	Testing int `json:"testing" gorm:"-"`
 }
 
 type StrategyInstanceConfig struct {
-	ID int `json:"instance_id" gorm:"column:instance_id"`
+	ID     int    `json:"instance_id" gorm:"column:instance_id"`
 	Config string `json:"config" gorm:"column:config_string"`
 }
 
 type StrategyMonitoring struct {
 	*StrategyInstance
-	Name string `json:"name" gorm:"name"`
-	Profit float64 `json:"profit" gorm:"column:profit"`
+	Name    string  `json:"name" gorm:"name"`
+	Profit  float64 `json:"profit" gorm:"column:profit"`
 	WinRate float64 `json:"winRate" gorm:"column:win_rate" `
 }
 
-func (s StrategyInstance) TableName() string  {
+func (s *StrategyInstance) TableName() string {
 	return StrategyInstancesTableName
 }
 
-func (s StrategyMonitoring) TableName() string  {
+func (s *StrategyMonitoring) TableName() string {
 	return strategyMonitoringTableName
 }
 
-func (s StrategyInstanceConfig) TableName() string  {
+func (s *StrategyInstanceConfig) TableName() string {
 	return StrategyInstanceConfigTableName
 }
 
-func CreateConfig(instanceID int,config []byte, db *gorm.DB) error {
+func (s *StrategyInstance) CalculateIsAliveStatus() {
+	timeframe := time.Second * time.Duration(s.TimeFrame)
+	timeIsAlive := s.LastPingTime.Add(timeframe * 2)
+	if time.Now().After(timeIsAlive) {
+		s.AliveStatus = StatusNotResponding
+	} else {
+		s.AliveStatus = StatusAlive
+	}
+}
+
+func CreateConfig(instanceID int, config []byte, db *gorm.DB) error {
 	sConf := StrategyInstanceConfig{
-		ID: instanceID,
+		ID:     instanceID,
 		Config: string(config),
 	}
 
@@ -74,35 +91,28 @@ func GetInstanceConfig(instanceID int, db *gorm.DB) (*StrategyInstanceConfig, er
 }
 
 func GetInstanceFromConfig(conf configs.BaseStrategyConfig, userID, strategyID int) *StrategyInstance {
-	inst := &StrategyInstance{
-		Pair:       conf.Pair,
-		Bid:        conf.BidSize,
-		UserID:     userID,
-		StrategyID: strategyID,
-		IsFutures: conf.IsFutures,
-		TimeFrame:  conf.TimeFrame,
-		Status:     helpers.Created,
-		StopLoss: conf.StopLoss,
-		TradeStopLoss: conf.TradeStopLoss,
+	return &StrategyInstance{
+		Pair:            conf.Pair,
+		Bid:             conf.BidSize,
+		UserID:          userID,
+		StrategyID:      strategyID,
+		TimeFrame:       conf.TimeFrame,
+		Status:          helpers.Created,
+		StopLoss:        conf.StopLoss,
+		TradeStopLoss:   conf.TradeStopLoss,
 		TradeTakeProfit: conf.TradeTakeProfit,
+		Leverage:        conf.Leverage,
 	}
-
-	if inst.IsFutures {
-		inst.Leverage = conf.Leverage
-	}
-
-	return inst
 }
 
 // CreateStrategyInstance - creates new instance of strategy
-func CreateStrategyInstance(db *gorm.DB, strategyInstance *StrategyInstance) (*StrategyInstance, error)  {
+func CreateStrategyInstance(db *gorm.DB, strategyInstance *StrategyInstance) (*StrategyInstance, error) {
 	err := db.Create(&strategyInstance).Error
 	if err != nil {
 		return nil, err
 	}
 	return strategyInstance, err
 }
-
 
 // ListInstancesForUser - returns list of instances for given user
 func ListInstancesForUser(db *gorm.DB, userID int) ([]*StrategyMonitoring, error) {
@@ -111,22 +121,27 @@ func ListInstancesForUser(db *gorm.DB, userID int) ([]*StrategyMonitoring, error
 	if err != nil {
 		return nil, err
 	}
+
+	for i := range instances {
+		instances[i].CalculateIsAliveStatus()
+	}
 	return instances, err
 }
 
-func GetInstanceByID(db *gorm.DB, id int) (*StrategyMonitoring, error)  {
+func GetInstanceByID(db *gorm.DB, id int) (*StrategyMonitoring, error) {
 	var instance *StrategyMonitoring
 	err := db.Where("id = ?", id).Find(&instance).Error
 	if err != nil {
 		return nil, err
 	}
+	instance.CalculateIsAliveStatus()
 	return instance, nil
 }
 
 // DeleteInstance - deletes given instance for good
 func DeleteInstance(db *gorm.DB, instanceID, userID int) error {
 	err := db.Delete(&StrategyInstance{
-		ID: instanceID,
+		ID:     instanceID,
 		UserID: userID,
 	}).Error
 	return err
@@ -146,7 +161,7 @@ func DeleteSelectedInstances(db *gorm.DB, ids []int, userID int) error {
 
 // UpdateStatus - updates status of running instance
 func UpdateStatus(db *gorm.DB, instanceID int, status string) error {
-	err := db.Table(StrategyInstancesTableName).Where("id = ?", instanceID).Update("status",status).Error
+	err := db.Table(StrategyInstancesTableName).Where("id = ?", instanceID).Update("status", status).Error
 	if err != nil {
 		return err
 	}

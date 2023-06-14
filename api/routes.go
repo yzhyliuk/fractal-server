@@ -84,6 +84,7 @@ func strategyRoutes(app *fiber.App) {
 	strategiesGroup.Delete("/config/:id", strategyController.DeleteConfig)
 	strategiesGroup.Get("/instances/config/:id", strategyController.GetInstanceConfig)
 	strategiesGroup.Post("/instances/config/change", strategyController.ChangeConfig)
+	strategiesGroup.Get("/instance/close-trade", strategyController.CloseCurrentTrade)
 }
 
 func neuralNetworkRoutes(app *fiber.App) {

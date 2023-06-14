@@ -28,13 +28,13 @@ func PrepareStrategy(conf configs.BaseStrategyConfig, userID int, strategyID int
 		return nil, nil, nil, err
 	}
 
-	monitorName := fmt.Sprintf("%s:%d:%t", conf.Pair, conf.TimeFrame, inst.IsFutures)
+	monitorName := fmt.Sprintf("%s:%d", conf.Pair, conf.TimeFrame)
 
 	var monitorChannel chan *block.Data
 	if storage.MonitorsBinance[monitorName] != nil {
 		monitorChannel = storage.MonitorsBinance[monitorName].Subscribe(inst.ID)
 	} else {
-		monitor := monitoring.NewBinanceMonitor(conf.Pair, time.Duration(conf.TimeFrame*int(time.Second)), inst.IsFutures)
+		monitor := monitoring.NewBinanceMonitor(conf.Pair, time.Duration(conf.TimeFrame*int(time.Second)))
 		storage.MonitorsBinance[monitorName] = monitor
 		storage.MonitorsBinance[monitorName].RunMonitor()
 		monitorChannel = storage.MonitorsBinance[monitorName].Subscribe(inst.ID)

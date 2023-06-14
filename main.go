@@ -37,8 +37,10 @@ func main() {
 	signal.Notify(c, syscall.SIGKILL)
 	go func() {
 		_ = <-c
-		logs.LogDebug("Gracefull shutdown", nil)
-		terminateAllStrategies()
+		if configuration.Mode != configuration.DebugProd {
+			logs.LogDebug("Gracefull shutdown", nil)
+			terminateAllStrategies()
+		}
 	}()
 
 	common.InitSpotTradingPairs()
@@ -79,6 +81,7 @@ func main() {
 
 func terminateAllStrategies() {
 	logs.LogDebug("Terminating all strategies...", nil)
+	logs.LogDebug("Set restart status to strategies", nil)
 	for _, v := range storage.StrategiesStorage {
 		v.Stop()
 	}

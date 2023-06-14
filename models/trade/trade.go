@@ -15,12 +15,12 @@ const BinanceSpotTakerFee = 0.00075
 
 // Trade - represents trade instance
 type Trade struct {
-	ID             int              `json:"id" gorm:"column:id"`
-	Pair           string           `json:"pair" gorm:"column:pair"`
-	StrategyID     int              `json:"strategyID" gorm:"column:strategy_id"`
-	InstanceID     int              `json:"instanceID" gorm:"column:instance_id"`
-	UserID         int              `json:"userID" gorm:"column:user_id"`
-	IsFutures      bool             `json:"isFutures" gorm:"column:is_futures"`
+	ID         int    `json:"id" gorm:"column:id"`
+	Pair       string `json:"pair" gorm:"column:pair"`
+	StrategyID int    `json:"strategyID" gorm:"column:strategy_id"`
+	InstanceID int    `json:"instanceID" gorm:"column:instance_id"`
+	UserID     int    `json:"userID" gorm:"column:user_id"`
+	//IsFutures      bool             `json:"isFutures" gorm:"column:is_futures"`
 	PriceOpen      float64          `json:"priceOpen" gorm:"column:price_open"`
 	PriceClose     float64          `json:"priceClose" gorm:"column:price_close"`
 	USD            float64          `json:"usd" gorm:"column:usd"`
@@ -89,24 +89,16 @@ func (t *Trade) CalculateProfitRoi() {
 	profit := 0.
 	fee := t.USD * BinanceFuturesTakerFeeRate
 
-	if t.IsFutures {
-		switch t.FuturesSide {
-		case futures.SideTypeBuy:
-			profit = (t.Quantity * t.PriceClose) - t.USD
-		case futures.SideTypeSell:
-			profit = (t.Quantity * t.PriceOpen) - (t.Quantity * t.PriceClose)
-		}
-	} else {
+	switch t.FuturesSide {
+	case futures.SideTypeBuy:
 		profit = (t.Quantity * t.PriceClose) - t.USD
+	case futures.SideTypeSell:
+		profit = (t.Quantity * t.PriceOpen) - (t.Quantity * t.PriceClose)
 	}
 
 	profit -= 2 * fee
 
-	if t.IsFutures {
-		roi = profit / (t.USD / float64(*t.Leverage))
-	} else {
-		roi = profit / t.USD
-	}
+	roi = profit / (t.USD / float64(*t.Leverage))
 
 	t.Profit = profit
 	t.ROI = roi

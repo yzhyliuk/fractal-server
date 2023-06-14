@@ -43,7 +43,7 @@ func (n *NotificationController) DismissAll(c *fiber.Ctx) error {
 	return c.SendStatus(http.StatusOK)
 }
 
-func (n *NotificationController) NotificationsWS(c *websocket.Conn)  {
+func (n *NotificationController) NotificationsWS(c *websocket.Conn) {
 	notificationList := make([]*notifications.Notification, 0)
 
 	for {
@@ -51,8 +51,8 @@ func (n *NotificationController) NotificationsWS(c *websocket.Conn)  {
 		ui := c.Locals("userInfo")
 		userInfo := ui.(*auth.Payload)
 
-	    nfList, err := notifications.ListNotificationsForUser(n.GetDB(),userInfo.UserID)
-		if err != nil{
+		nfList, err := notifications.ListNotificationsForUser(n.GetDB(), userInfo.UserID)
+		if err != nil {
 			logs.LogError(err)
 		}
 
@@ -72,6 +72,6 @@ func (n *NotificationController) NotificationsWS(c *websocket.Conn)  {
 			}
 		}
 
-		time.Sleep(10*time.Second)
+		time.Sleep(60 * time.Second)
 	}
 }

@@ -7,14 +7,13 @@ import (
 	"newTradingBot/indicators"
 	"newTradingBot/logs"
 	"newTradingBot/models/account"
-	"newTradingBot/models/block"
 	"newTradingBot/models/strategy"
 	"newTradingBot/models/strategy/instance"
 	"newTradingBot/models/users"
 	"newTradingBot/strategies/common"
+	"os"
+	"os/exec"
 	"strconv"
-	"sync"
-	"time"
 )
 
 type DF struct {
@@ -48,9 +47,6 @@ type experimentalContinuousStrategy struct {
 	buyersSellersRatio []float64
 
 	balance float64
-
-	mutex            sync.Mutex
-	bigVolumeCounter int
 }
 
 func NewContinuousExperimentalStrategy(config continuousConfig, keys *users.Keys, inst *instance.StrategyInstance) (strategy.Strategy, error) {
@@ -67,13 +63,13 @@ func NewContinuousExperimentalStrategy(config continuousConfig, keys *users.Keys
 	newStrategy.StrategyInstance = inst
 	newStrategy.ExperimentalHandler = newStrategy.Start
 
-	newStrategy.priceObservations = make([]float64, 300)
-	newStrategy.volumeObservations = make([]float64, 300)
+	newStrategy.priceObservations = make([]float64, 50)
+	newStrategy.volumeObservations = make([]float64, 50)
 
-	newStrategy.highVolumeOrders = make([]*DF, 60)
+	newStrategy.highVolumeOrders = make([]*DF, 50)
 
-	newStrategy.volumeRatio = make([]float64, 60)
-	newStrategy.buyersSellersRatio = make([]float64, 60)
+	newStrategy.volumeRatio = make([]float64, 50)
+	newStrategy.buyersSellersRatio = make([]float64, 50)
 
 	newStrategy.balance = 100
 
@@ -86,8 +82,6 @@ func (e *experimentalContinuousStrategy) Start() {
 		db, _ := database.GetDataBaseConnection()
 		_ = instance.UpdateStatus(db, e.StrategyInstance.ID, instance.StatusRunning)
 	}
-
-	go e.TradesPerFiveSeconds()
 
 	fmt.Printf("\n Run experimental for %s \n", e.config.Pair)
 
@@ -104,10 +98,10 @@ func (e *experimentalContinuousStrategy) Start() {
 			return
 		}
 
-		quantityMean := indicators.Average(e.volumeObservations)
-		quantitySD := indicators.StandardDeviation(e.volumeObservations)
+		//quantityMean := indicators.Average(e.volumeObservations)
+		//quantitySD := indicators.StandardDeviation(e.volumeObservations)
 
-		up := quantityMean + quantitySD*2
+		//up := quantityMean + quantitySD*3
 
 		orderType := "LIMIT"
 		if !event.Maker {
@@ -120,120 +114,120 @@ func (e *experimentalContinuousStrategy) Start() {
 			direction = UP
 		}
 
-		if quantity > up {
-			e.highVolumeOrders = e.highVolumeOrders[1:]
-			e.highVolumeOrders = append(e.highVolumeOrders, &DF{
-				Price:     price,
-				Volume:    quantity,
-				Type:      orderType,
-				Direction: direction,
-			})
+		//if quantity > up {
+		e.highVolumeOrders = e.highVolumeOrders[1:]
+		e.highVolumeOrders = append(e.highVolumeOrders, &DF{
+			Price:     price,
+			Volume:    quantity,
+			Type:      orderType,
+			Direction: direction,
+		})
 
-			e.mutex.Lock()
-			e.bigVolumeCounter++
-			e.mutex.Unlock()
+		if e.highVolumeOrders[0] != nil {
+			buyersVolume := 0.
+			sellersVolume := 0.
 
-			if e.highVolumeOrders[0] != nil {
-				buyersVolume := 0.
-				sellersVolume := 0.
+			buyersCount := 0
+			sellersCount := 0
 
-				buyersCount := 0
-				sellersCount := 0
-
-				for _, order := range e.highVolumeOrders {
-					if order.Direction == UP {
-						buyersVolume += order.Volume
-						buyersCount++
-					} else {
-						sellersVolume += order.Volume
-						sellersCount++
-					}
+			for _, order := range e.highVolumeOrders {
+				if order.Direction == UP {
+					buyersVolume += order.Volume
+					buyersCount++
+				} else {
+					sellersVolume += order.Volume
+					sellersCount++
 				}
+			}
 
-				volumeRatio := buyersVolume / sellersVolume                        // more than 1 - more buyers volume
-				buyersSellersRatio := float64(buyersCount) / float64(sellersCount) //more than 1 - more buyers
+			volumeRatio := buyersVolume / sellersVolume                        // more than 1 - more buyers volume
+			buyersSellersRatio := float64(buyersCount) / float64(sellersCount) //more than 1 - more buyers
 
-				e.mutex.Lock()
-				e.buyersSellersRatio = e.buyersSellersRatio[1:]
-				e.buyersSellersRatio = append(e.buyersSellersRatio, buyersSellersRatio)
+			e.buyersSellersRatio = e.buyersSellersRatio[1:]
+			e.buyersSellersRatio = append(e.buyersSellersRatio, buyersSellersRatio)
 
-				e.volumeRatio = e.volumeRatio[1:]
-				e.volumeRatio = append(e.volumeRatio, volumeRatio)
-				e.mutex.Unlock()
+			e.volumeRatio = e.volumeRatio[1:]
+			e.volumeRatio = append(e.volumeRatio, volumeRatio)
 
-				//if e.volumeRatio[0] != 0 {
-				//meanVolumeRatio := indicators.Average(e.volumeRatio)
-				//meanCountRatio := indicators.Average(e.buyersSellersRatio)
-				//
-				//vSD := indicators.StandardDeviation(e.volumeRatio)
-				//cSD := indicators.StandardDeviation(e.buyersSellersRatio)
+			if e.volumeRatio[0] != 0 {
+				meanVolumeRatio := indicators.Average(e.volumeRatio)
+				meanCountRatio := indicators.Average(e.buyersSellersRatio)
 
-				//upVolume := meanVolumeRatio + vSD*2.71828
-				//donwVolume := meanVolumeRatio - vSD*2.71828
-				//
-				//upCount := meanCountRatio + cSD*2.71828
-				//donwCount := meanCountRatio - cSD*2.71828
+				vSD := indicators.StandardDeviation(e.volumeRatio)
+				cSD := indicators.StandardDeviation(e.buyersSellersRatio)
 
-				if volumeRatio > 1.2 {
+				cmd := exec.Command("clear")
+				cmd.Stdout = os.Stdout
+				cmd.Run()
+				fmt.Println("V: ", volumeRatio, " Mean: ", meanVolumeRatio)
+				fmt.Println("B: ", buyersSellersRatio, " Mean: ", meanCountRatio)
+
+				upVolume := meanVolumeRatio + vSD*2.71828
+				donwVolume := meanVolumeRatio - vSD*2.71828
+
+				upCount := meanCountRatio + cSD*2.71828
+				donwCount := meanCountRatio - cSD*2.71828
+
+				if volumeRatio > upVolume && buyersSellersRatio > upCount &&
+					volumeRatio > 1 && buyersSellersRatio > 1 {
 					//buy
 					if e.trend != UP {
 						e.trend = UP
 						e.PrintData(price, volumeRatio, buyersSellersRatio)
 
-						e.CloseAllTrades()
-						err := e.HandleBuy(&block.Data{ClosePrice: price})
-						if err != nil {
-							logs.LogError(err)
-						}
+						//e.CloseAllTrades()
+						//err := e.HandleBuy(&block.Data{ClosePrice: price})
+						//if err != nil {
+						//	logs.LogError(err)
+						//}
 					}
-				} else if volumeRatio < 0.8 {
+				} else if volumeRatio < donwVolume && buyersSellersRatio < donwCount &&
+					volumeRatio < 1 && buyersSellersRatio < 1 {
 					//sell
 					if e.trend != DOWN {
 						e.trend = DOWN
 						e.PrintData(price, volumeRatio, buyersSellersRatio)
 
-						e.CloseAllTrades()
-						err := e.HandleSell(&block.Data{ClosePrice: price})
-						if err != nil {
-							logs.LogError(err)
-						}
+						//e.CloseAllTrades()
+						//err := e.HandleSell(&block.Data{ClosePrice: price})
+						//if err != nil {
+						//	logs.LogError(err)
+						//}
 					}
-				} else {
-					conditionOne := e.trend == UP && volumeRatio < 0.8
-					conditionTwo := e.trend == DOWN && volumeRatio > 1.2
-					if conditionOne || conditionTwo {
-						e.CloseAllTrades()
-						e.trend = NOTREND
-						e.PrintData(price, volumeRatio, buyersSellersRatio)
-					}
-					//if e.trend != NOTREND {
-					//	e.trend = NOTREND
-					//	e.PrintData(price, volumeRatio, buyersSellersRatio)
-					//	e.CloseAllTrades()
-					//}
 				}
-
-				//}
-
-				//if buyersVolume > sellersVolume && buyersCount > sellersCount {
-				//	// Buy trend
-				//	if e.trend != UP {
-				//		e.trend = UP
-				//		e.lastPivotPrice = price
-				//
-				//		fmt.Println(fmt.Sprintf("PRICE: %f TREND: %s \n BUERS: %d VOLUME: %f \n SEELLERS: %d VOLUME %f", price, e.trend, buyersCount, buyersVolume, sellersCount, sellersVolume))
-				//
+				//else {
+				//	conditionOne := e.trend == UP && volumeRatio < meanVolumeRatio && buyersSellersRatio < meanCountRatio
+				//	conditionTwo := e.trend == DOWN && volumeRatio > meanVolumeRatio && buyersSellersRatio > meanCountRatio
+				//	if conditionOne || conditionTwo {
+				//		e.CloseAllTrades()
 				//	}
-				//} else if buyersVolume < sellersVolume && buyersCount < sellersCount {
-				//	// Sell trend
-				//	if e.trend != DOWN {
-				//		e.trend = DOWN
-				//		e.lastPivotPrice = price
-				//
-				//		fmt.Println(fmt.Sprintf("PRICE: %f TREND: %s \n BUERS: %d VOLUME: %f \n SEELLERS: %d VOLUME %f \n \n", price, e.trend, buyersCount, buyersVolume, sellersCount, sellersVolume))
+				//	if e.trend != NOTREND {
+				//		e.trend = NOTREND
+				//		e.PrintData(price, volumeRatio, buyersSellersRatio)
+				//		e.CloseAllTrades()
 				//	}
 				//}
+
 			}
+
+			//if buyersVolume > sellersVolume && buyersCount > sellersCount {
+			//	// Buy trend
+			//	if e.trend != UP {
+			//		e.trend = UP
+			//		e.lastPivotPrice = price
+			//
+			//		fmt.Println(fmt.Sprintf("PRICE: %f TREND: %s \n BUERS: %d VOLUME: %f \n SEELLERS: %d VOLUME %f", price, e.trend, buyersCount, buyersVolume, sellersCount, sellersVolume))
+			//
+			//	}
+			//} else if buyersVolume < sellersVolume && buyersCount < sellersCount {
+			//	// Sell trend
+			//	if e.trend != DOWN {
+			//		e.trend = DOWN
+			//		e.lastPivotPrice = price
+			//
+			//		fmt.Println(fmt.Sprintf("PRICE: %f TREND: %s \n BUERS: %d VOLUME: %f \n SEELLERS: %d VOLUME %f \n \n", price, e.trend, buyersCount, buyersVolume, sellersCount, sellersVolume))
+			//	}
+			//}
 		}
 	}
 
@@ -250,34 +244,6 @@ func (e *experimentalContinuousStrategy) PrintData(price, volume, count float64)
 	fmt.Printf("================== \n")
 	fmt.Printf("PRICE: %f TREND: %s \n Volume Ratio: %f Count Ratio: %f \n", price, e.trend, volume, count)
 	fmt.Printf("================== \n \n")
-}
-
-func (e *experimentalContinuousStrategy) TradesPerFiveSeconds() {
-	for {
-		select {
-		case <-e.StopSignal:
-			break
-		default:
-			tradesCount := 0
-
-			wsAggTradeHandler := func(event *futures.WsAggTradeEvent) {
-				tradesCount++
-			}
-			_, stopC, _ := futures.WsAggTradeServe(e.config.Pair, wsAggTradeHandler, errHandlerLog)
-
-			time.Sleep(time.Second * 5)
-			stopC <- struct{}{}
-			fmt.Println("=========")
-			fmt.Println("Trades: ", tradesCount)
-			e.mutex.Lock()
-			fmt.Println("High Volume: ", e.bigVolumeCounter)
-			fmt.Println("V: ", e.volumeRatio[len(e.volumeRatio)-1])
-			fmt.Println("B: ", e.buyersSellersRatio[len(e.buyersSellersRatio)-1])
-			fmt.Println("=========")
-			e.bigVolumeCounter = 0
-			e.mutex.Unlock()
-		}
-	}
 }
 
 func (e *experimentalContinuousStrategy) Stop() {

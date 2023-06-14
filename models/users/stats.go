@@ -7,8 +7,8 @@ import (
 
 type UserStats struct {
 	User
-	TradesClosed int `json:"trades_closed"`
-	TotalVolumeMargin float64 `json:"total_volume_margin"`
+	TradesClosed          int     `json:"trades_closed"`
+	TotalVolumeMargin     float64 `json:"total_volume_margin"`
 	TotalVolume           float64 `json:"total_volume"`
 	TotalProfit           float64 `json:"total_profit"`
 	AverageProfitPerTrade float64 `json:"average_profit_per_trade"`
@@ -39,7 +39,7 @@ func GetUserStats(db *gorm.DB, userID int) (*UserStats, error) {
 	stats.TotalVolume = volume
 	stats.TotalVolumeMargin = volumeMargin
 	if stats.TradesClosed != 0 {
-		stats.AverageProfitPerTrade = totalProfit/float64(stats.TradesClosed)
+		stats.AverageProfitPerTrade = totalProfit / float64(stats.TradesClosed)
 	}
 	return stats, nil
 
@@ -51,7 +51,7 @@ func TotalProfitAndVolume(trades []*trade.Trade) (profit, volume, volumeMargin f
 	volumeMargin = 0.
 	for _, t := range trades {
 		profit += t.Profit
-		if t.IsFutures && t.Leverage != nil {
+		if t.Leverage != nil {
 			volume += t.USD / float64(*(t.Leverage))
 			volumeMargin += t.USD
 		} else {

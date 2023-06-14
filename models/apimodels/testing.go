@@ -25,6 +25,8 @@ type BackTestingResult struct {
 	TimeFrame             int            `json:"timeFrame"`
 	Pair                  string         `json:"pair"`
 	Profit                float64        `json:"profit"`
+	MaxCumulativeProfit   float64        `json:"maxCumulativeProfit"`
+	MaxCumulativeLoss     float64        `json:"maxCumulativeLoss"`
 }
 
 type MassTestingResult struct {

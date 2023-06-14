@@ -12,7 +12,8 @@ import (
 	"time"
 )
 
-const ratioThreshold = 0.05
+const ratioThreshold = 0.015
+const maxTrade = 3
 
 var mutex sync.Mutex
 var lastPrice = make(map[string]float64)
@@ -23,7 +24,6 @@ func RunArbitrageWithParams(targetCurrency, primarySymbol string, acc account.Ac
 	if err != nil {
 		return err
 	}
-
 	for k, _ := range allPairs {
 		if strings.Contains(k, primarySymbol) && !strings.Contains(k, targetCurrency) {
 			if primarySymbol == "XRP" {
@@ -62,21 +62,30 @@ func RunArbitrageWithParams(targetCurrency, primarySymbol string, acc account.Ac
 
 	logs.LogDebug("Start Monitoring", err)
 
+	tC := 0
 	for {
+		if tC > maxTrade {
+			break
+		}
 		for i := range secondarySymbols {
 			symbolThree := fmt.Sprintf("%s%s", strings.Replace(secondarySymbols[i], primarySymbol, "", 1), targetCurrency)
-			priceOne, priceTwo, _, ratio, signal := GetStaticRatio(symbolOne, secondarySymbols[i], symbolThree)
+			priceOne, priceTwo, priceThree, ratio, signal := GetStaticRatio(symbolOne, secondarySymbols[i], symbolThree, primarySymbol, targetCurrency)
 			if signal {
 				timestamp := time.Now()
 				err = manageTrade(symbolOne, secondarySymbols[i], symbolThree, primarySymbol, priceOne, priceTwo, buySum, acc)
 				if err != nil {
 					logs.LogDebug("", err)
 				}
+				tC++
 				logs.LogDebug(fmt.Sprintf("%s %s %s RATIO: %f", secondarySymbols[i], primarySymbol, targetCurrency, ratio), nil)
 				logs.LogDebug(fmt.Sprintf("Trade execution time: %s", time.Since(timestamp)), nil)
+				logs.LogDebug(fmt.Sprintf("P1: %f P2: %f P3: %f", priceOne, priceTwo, priceThree), nil)
+				time.Sleep(5 * time.Second)
 			}
 		}
 	}
+
+	return nil
 }
 
 func RunMonitor(symbol string) {
@@ -93,7 +102,7 @@ func RunMonitor(symbol string) {
 				logs.LogError(err)
 			})
 
-			time.Sleep(1 * time.Second)
+			time.Sleep(100 * time.Millisecond)
 			stopC <- struct{}{}
 
 			if pricesum == 0 {
@@ -107,14 +116,25 @@ func RunMonitor(symbol string) {
 	}()
 }
 
-func GetStaticRatio(s1, s2, s3 string) (ratio, priceOne, priceTwo, priceThree float64, up bool) {
+func GetStaticRatio(s1, s2, s3, primary, target string) (ratio, priceOne, priceTwo, priceThree float64, up bool) {
 	mutex.Lock()
 	priceTwo = lastPrice[s2]
 	priceThree = lastPrice[s3]
 	priceOne = lastPrice[s1]
 	mutex.Unlock()
 
-	ratio = (((1 / priceOne) / priceTwo) * priceThree) - (2 * account.BinanceSpotTakerFee)
+	stepOne := 1 / priceOne
+	stepTwo := 0.
+
+	if strings.Index(s2, primary) != 0 {
+		//buy
+		stepTwo = stepOne / priceTwo
+	} else {
+		//sell
+		stepTwo = stepOne * priceTwo
+	}
+
+	ratio = stepTwo*priceThree - (2 * account.BinanceSpotTakerFee)
 
 	return priceOne, priceTwo, priceThree, ratio, ratio >= 1+ratioThreshold
 }
@@ -145,7 +165,7 @@ func GetRatio(s1, s2, s3 string) (ratio, priceOne, priceTwo, priceThree float64,
 }
 
 func getInstantPrice(symbol string) float64 {
-	count := 50
+	count := 10
 	resp, err := binance.NewClient("", "").NewRecentTradesService().Symbol(symbol).Limit(count).Do(context.Background())
 	if err != nil {
 		logs.LogDebug("", err)
@@ -172,13 +192,15 @@ func manageTrade(symbolOne, symbolTwo, symbolThree, primary string, priceOne, pr
 
 	quantityPrimary, _ := strconv.ParseFloat(order.ExecutedQuantity, 64)
 
+	sideType := binance.SideTypeBuy
 	if strings.Index(symbolTwo, primary) != 0 {
 		quantity = quantityPrimary / priceTwo
 	} else {
 		quantity = quantityPrimary * priceTwo
+		sideType = binance.SideTypeSell
 	}
 
-	order, err = acc.PlaceRawSpotOrder(quantity, symbolTwo, binance.SideTypeBuy)
+	order, err = acc.PlaceRawSpotOrder(quantity, symbolTwo, sideType)
 	if err != nil {
 		_, _ = acc.PlaceRawSpotOrder(quantityPrimary, symbolOne, binance.SideTypeSell)
 		return err
@@ -191,8 +213,8 @@ func manageTrade(symbolOne, symbolTwo, symbolThree, primary string, priceOne, pr
 	}
 
 	logs.LogDebug(fmt.Sprintf("Step 1: %s - SUCCESS! ", symbolOne), nil)
-	logs.LogDebug(fmt.Sprintf("Step 3: %s - SUCCESS", symbolThree), nil)
 	logs.LogDebug(fmt.Sprintf("Step 2: %s - SUCCESS! ", symbolTwo), nil)
+	logs.LogDebug(fmt.Sprintf("Step 3: %s - SUCCESS", symbolThree), nil)
 
 	return nil
 }
