@@ -121,6 +121,28 @@ func (t *TestingController) GetSelectDataOptions(c *fiber.Ctx) error {
 	return c.JSON(capt)
 }
 
+func (t *TestingController) GetTestingData(c *fiber.Ctx) error {
+
+	var input *apimodels.CreateTestingDataModel
+
+	err := c.BodyParser(&input)
+	if err != nil {
+		return err
+	}
+
+	userinfo, err := t.GetUserInfo(c)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		_, err := recording.GetBinanceData(t.GetDB(), input.Pair, userinfo.UserID, input.TimeFrame, input.NumberOfTimeFrames)
+		logs.LogError(err)
+	}()
+
+	return c.JSON(http.StatusOK)
+}
+
 func (t *TestingController) HandleWS(c *websocket.Conn) {
 }
 

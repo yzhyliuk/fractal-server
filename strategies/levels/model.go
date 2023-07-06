@@ -17,6 +17,9 @@ import (
 	"strconv"
 )
 
+const atrLength = 14
+const trendLine = 400
+
 type Levels struct {
 	common.Strategy
 	config LevelsConfig
@@ -29,13 +32,8 @@ type Levels struct {
 	trendBarsCounter int
 	prevTrend        string
 
-	supplyPriceL float64
-	supplyPriceH float64
-	supplyVolume float64
-
-	demandPriceL float64
-	demandPriceH float64
-	demandVolume float64
+	highLevel float64
+	lowLevel  float64
 }
 
 const StrategyName = "levels"
@@ -69,8 +67,10 @@ func NewLevels(monitorChannel chan *block.Data, configRaw []byte, keys *users.Ke
 	newStrategy.DataProcessFunction = newStrategy.ProcessData
 	newStrategy.DataLoadEndpoint = newStrategy.LoadData
 
-	newStrategy.closePrice = make([]float64, 120)
-	newStrategy.volume = make([]float64, 120)
+	newStrategy.closePrice = make([]float64, trendLine)
+	newStrategy.volume = make([]float64, trendLine)
+	newStrategy.highPrice = make([]float64, trendLine)
+	newStrategy.lowPrice = make([]float64, trendLine)
 
 	return newStrategy, nil
 }
@@ -88,45 +88,37 @@ func (l *Levels) HandlerFunc(marketData *block.Data) {
 			return
 		}
 
-		volumeMean := indicators.Average(l.volume)
-		volumeDeviation := indicators.StandardDeviation(l.volume)
-
-		volumeAnomaly := volumeMean + 5*volumeDeviation
-		priceMovement := marketData.ClosePrice - marketData.OpenPrice
-
-		if marketData.Volume > volumeAnomaly {
-			if priceMovement > 0 {
-				l.demandPriceL = marketData.OpenPrice
-				l.demandPriceH = marketData.OpenPrice + (marketData.ClosePrice-marketData.OpenPrice)/4
-			} else {
-				l.supplyPriceH = marketData.OpenPrice
-				l.demandPriceH = marketData.OpenPrice + (marketData.ClosePrice-marketData.OpenPrice)/4
-			}
-
-			return
-		}
-
-		// try to trade on breakouts
-		if marketData.ClosePrice > l.supplyPriceH+l.supplyPriceH*0.001 && l.supplyPriceL > 0 {
-			// buy
+		if marketData.ClosePrice > l.highLevel {
 			l.HandleBuy(marketData)
-			l.ClearData()
+
+			ATR := indicators.AverageTrueRange(indicators.GetSlicedArray(l.highPrice, atrLength), indicators.GetSlicedArray(l.lowPrice, atrLength), indicators.GetSlicedArray(l.closePrice, atrLength), atrLength)
+			l.StopLossPrice = marketData.ClosePrice - (2 * ATR[atrLength-1])
 		}
 
-		if marketData.ClosePrice < l.demandPriceL-l.demandPriceL*0.001 && l.demandPriceL > 0 {
-			// sell
+		if marketData.ClosePrice < l.lowLevel {
 			l.HandleSell(marketData)
-			l.ClearData()
+
+			ATR := indicators.AverageTrueRange(indicators.GetSlicedArray(l.highPrice, atrLength), indicators.GetSlicedArray(l.lowPrice, atrLength), indicators.GetSlicedArray(l.closePrice, atrLength), atrLength)
+			l.StopLossPrice = marketData.ClosePrice + (2 * ATR[atrLength-1])
 		}
 
+		l.GetLevels(marketData)
 	}
 }
 
-func (l *Levels) ClearData() {
-	l.supplyPriceL = 0
-	l.supplyPriceH = 0
-	l.demandPriceL = 0
-	l.demandPriceH = 0
+func (l *Levels) GetLevels(marketData *block.Data) {
+	low := 999999999999.
+	high := 0.
+
+	for i := range l.closePrice {
+		if low > l.closePrice[i] {
+			low = l.closePrice[i]
+		}
+
+		if high < l.closePrice[i] {
+			high = l.closePrice[i]
+		}
+	}
 }
 
 func (l *Levels) TrailingStopLoss(marketData *block.Data) {
@@ -209,6 +201,12 @@ func (l *Levels) ProcessData(marketData *block.Data) {
 
 	l.closePrice = l.closePrice[1:]
 	l.closePrice = append(l.closePrice, marketData.ClosePrice)
+
+	l.lowPrice = l.lowPrice[1:]
+	l.lowPrice = append(l.lowPrice, marketData.Low)
+
+	l.highPrice = l.highPrice[1:]
+	l.highPrice = append(l.highPrice, marketData.High)
 }
 
 func (l *Levels) GetPotentialProfit(sell bool, targetPrice, currentPrice float64) float64 {

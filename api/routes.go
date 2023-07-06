@@ -54,6 +54,7 @@ func testingRoutes(app *fiber.App) {
 	testingGroup.Get("/data-params", testingController.GetSelectDataOptions)
 	testingGroup.Get("/ws", websocket.New(testingController.HandleWS))
 	testingGroup.Get("/v2/ws", websocket.New(testingController.HandleWSv2))
+	testingGroup.Post("/get-new-data", testingController.GetTestingData)
 }
 
 func notificationsRoutes(app *fiber.App) {

@@ -45,7 +45,9 @@ func (c *CapturedData) ExtractData() *Data {
 }
 
 func (c *CapturedData) ConvertToDbObject() *CapturedData {
-	c.Trades = pq.Float64Array(c.TradesArray)
+	if c.TradesArray != nil {
+		c.Trades = pq.Float64Array(c.TradesArray)
+	}
 	return c
 }
 
