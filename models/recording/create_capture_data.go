@@ -112,6 +112,7 @@ func GetBinanceData(db *gorm.DB, pair string, userID, timeframe, numberOfTimeFra
 	}
 
 	capture.Status = StatusStopped
+	capture.StartDate = &toBeSavedStartTime
 	err = db.Save(&capture).Error
 	if err != nil {
 		return nil, err
