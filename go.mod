@@ -7,7 +7,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.38.1
 	github.com/gofiber/websocket/v2 v2.1.0
 	github.com/lib/pq v1.10.7
-	golang.org/x/crypto v0.1.0
+	golang.org/x/crypto v0.11.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gorm.io/driver/postgres v1.4.4
 	gorm.io/gorm v1.24.0
@@ -37,8 +37,9 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.40.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
-	golang.org/x/sys v0.1.0 // indirect
-	golang.org/x/text v0.4.0 // indirect
+	golang.org/x/net v0.10.0 // indirect
+	golang.org/x/sys v0.10.0 // indirect
+	golang.org/x/text v0.11.0 // indirect
 	gonum.org/v1/gonum v0.12.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 )
