@@ -23,15 +23,17 @@ func StartServer() (*fiber.App, error) {
 
 	establishRoutes(app)
 
+	// Certificate manager
 	m := &autocert.Manager{
 		Prompt: autocert.AcceptTOS,
 		// Replace with your domain
-		HostPolicy: autocert.HostWhitelist("fractal-server.com"),
+		HostPolicy: autocert.HostWhitelist("fractal-server.com", "www.fractal-server.com"),
 		// Folder to store the certificates
-		Cache: autocert.DirCache("./certs"),
+		Cache: autocert.DirCache("certs"),
 	}
 
 	// TLS Config
+	m.TLSConfig()
 	cfg := &tls.Config{
 		// Get Certificate from Let's Encrypt
 		GetCertificate: m.GetCertificate,
@@ -43,12 +45,17 @@ func StartServer() (*fiber.App, error) {
 			"http/1.1", "acme-tls/1",
 		},
 	}
-	ln, err := tls.Listen("tcp", ":443", cfg)
-	if err != nil {
-		panic(err)
-	}
 
-	return app, app.Listener(ln)
+	if configuration.Mode == configuration.Prod {
+		ln, err := tls.Listen("tcp", ":443", cfg)
+		if err != nil {
+			panic(err)
+		}
+
+		return app, app.Listener(ln)
+	} else {
+		return app, app.Listen(":8080")
+	}
 }
 
 func establishRoutes(app *fiber.App) {
