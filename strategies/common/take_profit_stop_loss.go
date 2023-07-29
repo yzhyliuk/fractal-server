@@ -83,6 +83,53 @@ func (s *Strategy) MaxLossPerStrategyCondition() bool {
 	return false
 }
 
+func (s *Strategy) SetStopLossPrice(marketData *block.Data) {
+	if s.LastTrade == nil || s.StrategyInstance.TradeStopLoss == 0 {
+		return
+	}
+
+	SL := s.StrategyInstance.TradeStopLoss
+	leverage := *s.StrategyInstance.Leverage
+	deviationPrice := marketData.ClosePrice * (SL / float64(leverage))
+
+	if s.LastTrade.FuturesSide == futures.SideTypeSell {
+		s.StopLossPrice = marketData.ClosePrice + deviationPrice
+	} else {
+		s.StopLossPrice = marketData.ClosePrice - deviationPrice
+	}
+}
+
+func (s *Strategy) SetTakeProfit(marketData *block.Data) {
+	if s.LastTrade == nil || s.StrategyInstance.TradeTakeProfit == 0 {
+		return
+	}
+	TP := s.StrategyInstance.TradeTakeProfit
+	leverage := *s.StrategyInstance.Leverage
+	deviationPrice := marketData.ClosePrice * (TP / float64(leverage))
+
+	if s.LastTrade.FuturesSide == futures.SideTypeSell {
+		s.TakeProfitPrice = marketData.ClosePrice - deviationPrice
+	} else {
+		s.TakeProfitPrice = marketData.ClosePrice + deviationPrice
+	}
+}
+
+func (s *Strategy) TrailingStopLoss(marketData *block.Data) {
+	closePrice := marketData.ClosePrice
+	prevClosePrice := s.prevMarketData.ClosePrice
+	if s.LastTrade.FuturesSide == futures.SideTypeBuy {
+		if closePrice > prevClosePrice {
+			delta := closePrice - prevClosePrice
+			s.StopLossPrice = s.StopLossPrice + delta
+		}
+	} else if s.LastTrade.FuturesSide == futures.SideTypeSell {
+		if closePrice < prevClosePrice {
+			delta := prevClosePrice - closePrice
+			s.StopLossPrice = s.StopLossPrice - delta
+		}
+	}
+}
+
 // HandleStrategyDefinedStopLoss - handles strategy defined stop loss prices
 func (s *Strategy) HandleStrategyDefinedStopLoss(data *block.Data) {
 	if s.LastTrade != nil {

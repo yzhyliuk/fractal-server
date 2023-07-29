@@ -1,7 +1,6 @@
 package common
 
 import (
-	"fmt"
 	"newTradingBot/api/database"
 	"newTradingBot/logs"
 	"newTradingBot/models/account"
@@ -91,7 +90,9 @@ func (s *Strategy) Execute() {
 				s.DataProcessFunction(marketData)
 				s.HandlerFunction(marketData)
 
-				logs.LogDebug(fmt.Sprintf("Data received by instance #%d", s.StrategyInstance.ID), nil)
+				s.prevMarketData = marketData
+
+				//logs.LogDebug(fmt.Sprintf("Data received by instance #%d", s.StrategyInstance.ID), nil)
 				if s.StrategyInstance.Testing != testing.BackTest {
 					s.UpdateLastPingTime()
 				}

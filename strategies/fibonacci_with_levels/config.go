@@ -2,7 +2,7 @@ package fibonacci_with_levels
 
 import "newTradingBot/models/strategy/configs"
 
-type FibonacciRetraceConfig struct {
+type FibonacciRetraceWithLevelsConfig struct {
 	configs.BaseStrategyConfig
 	MALength       int     `json:"maLength"`
 	BBLength       int     `json:"bbLength"`

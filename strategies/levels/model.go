@@ -17,9 +17,6 @@ import (
 	"strconv"
 )
 
-const atrLength = 14
-const trendLine = 400
-
 type Levels struct {
 	common.Strategy
 	config LevelsConfig
@@ -27,10 +24,17 @@ type Levels struct {
 	lowPrice   []float64
 	highPrice  []float64
 	closePrice []float64
+	openPrice  []float64
 	volume     []float64
+
+	rsi []*float64
+
+	deltaPrice []float64
 
 	trendBarsCounter int
 	prevTrend        string
+
+	prevEMA float64
 
 	highLevel float64
 	lowLevel  float64
@@ -67,10 +71,13 @@ func NewLevels(monitorChannel chan *block.Data, configRaw []byte, keys *users.Ke
 	newStrategy.DataProcessFunction = newStrategy.ProcessData
 	newStrategy.DataLoadEndpoint = newStrategy.LoadData
 
-	newStrategy.closePrice = make([]float64, trendLine)
-	newStrategy.volume = make([]float64, trendLine)
-	newStrategy.highPrice = make([]float64, trendLine)
-	newStrategy.lowPrice = make([]float64, trendLine)
+	newStrategy.closePrice = make([]float64, config.EMA)
+	newStrategy.volume = make([]float64, config.EMA)
+	newStrategy.highPrice = make([]float64, config.EMA)
+	newStrategy.lowPrice = make([]float64, config.EMA)
+	newStrategy.openPrice = make([]float64, config.EMA)
+	newStrategy.deltaPrice = make([]float64, config.EMA)
+	newStrategy.rsi = make([]*float64, 3)
 
 	return newStrategy, nil
 }
@@ -83,58 +90,119 @@ func (l *Levels) HandlerFunc(marketData *block.Data) {
 			_ = instance.UpdateStatus(db, l.StrategyInstance.ID, instance.StatusRunning)
 		}
 
-		if l.LastTrade != nil {
-			l.TrailingStopLoss(marketData)
+		//if l.prevEMA == 0 {
+		//	l.prevEMA = indicators.Average(l.closePrice)
+		//	return
+		//}
+		//
+		//ema := indicators.ExponentialMA(l.config.EMA, l.prevEMA, indicators.Average(l.closePrice))
+		//l.prevEMA = ema
+
+		ema := indicators.Average(l.closePrice)
+
+		mom := marketData.ClosePrice - l.closePrice[len(l.closePrice)-1-l.config.MomentumLength]
+
+		// Pay attention to this line while debug
+		crossUp := mom > 0
+		crossDown := mom < 0
+
+		// calculate RMA
+		u0 := marketData.ClosePrice
+		u1 := l.closePrice[len(l.closePrice)-2]
+		if u1 > u0 {
+			u0 = 0
+			u1 = 0
+		}
+		up := indicators.RMA(u0, u1, l.config.RSILength)
+
+		u0 = marketData.ClosePrice
+		u1 = l.closePrice[len(l.closePrice)-2]
+		if u1 < u0 {
+			u0 = 0
+			u1 = 0
+		} else {
+			u1 = marketData.ClosePrice
+			u0 = l.closePrice[len(l.closePrice)-2]
+		}
+		// Pay attention here maybe need absolute values
+		down := indicators.RMA(u0, u1, l.config.RSILength)
+		rsi := getRSI(up, down)
+		l.SaveRSI(rsi)
+		if l.rsi[0] == nil {
 			return
 		}
 
-		if marketData.ClosePrice > l.highLevel {
+		oversoldAgo := CheckOversoldAgo(l.rsi, float64(l.config.RSIOversold))
+		overboughtAgo := CheckOverboughtAgo(l.rsi, float64(l.config.RSIOverbought))
+
+		bullishDivergenceCondition := CheckBullishDivergence(l.rsi)
+		bearishDivergenceCondition := CheckBearishDivergence(l.rsi)
+
+		// Entry Conditions
+		longEntryCondition := crossUp && oversoldAgo && bullishDivergenceCondition
+		shortEntryCondition := crossDown && overboughtAgo && bearishDivergenceCondition
+
+		longCondition := longEntryCondition && marketData.ClosePrice <= ema
+		// Sell if short condition is met and price has pulled back to or above the 100 EMA
+		shortCondition := shortEntryCondition && marketData.ClosePrice >= ema
+
+		if longCondition {
 			l.HandleBuy(marketData)
-
-			ATR := indicators.AverageTrueRange(indicators.GetSlicedArray(l.highPrice, atrLength), indicators.GetSlicedArray(l.lowPrice, atrLength), indicators.GetSlicedArray(l.closePrice, atrLength), atrLength)
-			l.StopLossPrice = marketData.ClosePrice - (2 * ATR[atrLength-1])
+			l.SetStopLossPrice(marketData)
+			l.SetTakeProfit(marketData)
 		}
-
-		if marketData.ClosePrice < l.lowLevel {
+		if shortCondition {
 			l.HandleSell(marketData)
-
-			ATR := indicators.AverageTrueRange(indicators.GetSlicedArray(l.highPrice, atrLength), indicators.GetSlicedArray(l.lowPrice, atrLength), indicators.GetSlicedArray(l.closePrice, atrLength), atrLength)
-			l.StopLossPrice = marketData.ClosePrice + (2 * ATR[atrLength-1])
+			l.SetStopLossPrice(marketData)
+			l.SetTakeProfit(marketData)
 		}
 
-		l.GetLevels(marketData)
 	}
 }
 
-func (l *Levels) GetLevels(marketData *block.Data) {
-	low := 999999999999.
-	high := 0.
-
-	for i := range l.closePrice {
-		if low > l.closePrice[i] {
-			low = l.closePrice[i]
-		}
-
-		if high < l.closePrice[i] {
-			high = l.closePrice[i]
-		}
-	}
+func (l *Levels) SaveRSI(rsi float64) {
+	l.rsi = l.rsi[1:]
+	l.rsi = append(l.rsi, &rsi)
 }
 
-func (l *Levels) TrailingStopLoss(marketData *block.Data) {
-	index := len(l.closePrice) - 1
-	closePrice := marketData.ClosePrice
-	prevClosePrice := l.closePrice[index-1]
-	if l.LastTrade.FuturesSide == futures.SideTypeBuy {
-		if closePrice > prevClosePrice {
-			delta := closePrice - prevClosePrice
-			l.StopLossPrice = l.StopLossPrice + delta
+// CheckOversoldAgo checks if any of the last four RSI values are below or equal to the oversold threshold.
+func CheckOversoldAgo(rsi []*float64, rsiOversold float64) bool {
+	for i := range rsi {
+		if *rsi[i] <= rsiOversold {
+			return true
 		}
-	} else if l.LastTrade.FuturesSide == futures.SideTypeSell {
-		if closePrice < prevClosePrice {
-			delta := prevClosePrice - closePrice
-			l.StopLossPrice = l.StopLossPrice + delta
+	}
+	return false
+}
+
+// CheckOverboughtAgo checks if any of the last four RSI values are above or equal to the overbought threshold.
+func CheckOverboughtAgo(rsi []*float64, rsiOverbought float64) bool {
+	for i := range rsi {
+		if *rsi[i] >= rsiOverbought {
+			return true
 		}
+	}
+	return false
+}
+
+// CheckBullishDivergence checks for bullish divergence conditions.
+func CheckBullishDivergence(rsi []*float64) bool {
+	return *rsi[2] > *rsi[1] && *rsi[1] < *rsi[0]
+}
+
+// CheckBearishDivergence checks for bearish divergence conditions.
+func CheckBearishDivergence(rsi []*float64) bool {
+	return *rsi[2] < *rsi[1] && *rsi[1] > *rsi[0]
+}
+
+func getRSI(up, down float64) float64 {
+	if down == 0 {
+		return 100.0
+	} else if up == 0 {
+		return 0.0
+	} else {
+		rsi := 100.0 - 100.0/(1.0+up/down)
+		return rsi
 	}
 }
 
@@ -168,33 +236,6 @@ func (l *Levels) LoadData() error {
 	return nil
 }
 
-func (l *Levels) GetCurrentTrend(marketData *block.Data) string {
-	mean := indicators.Average(l.closePrice)
-
-	if mean < marketData.ClosePrice {
-		if l.prevTrend != UpTrend {
-			l.prevTrend = UpTrend
-			l.trendBarsCounter = 1
-		} else {
-			l.trendBarsCounter++
-		}
-	} else {
-		if l.prevTrend != DownTrend {
-			l.prevTrend = DownTrend
-			l.trendBarsCounter = 1
-		} else {
-			l.trendBarsCounter++
-		}
-	}
-
-	if l.trendBarsCounter > 6 {
-		return l.prevTrend
-	} else {
-		return NoTrend
-	}
-
-}
-
 func (l *Levels) ProcessData(marketData *block.Data) {
 	l.volume = l.volume[1:]
 	l.volume = append(l.volume, marketData.Volume)
@@ -207,6 +248,13 @@ func (l *Levels) ProcessData(marketData *block.Data) {
 
 	l.highPrice = l.highPrice[1:]
 	l.highPrice = append(l.highPrice, marketData.High)
+
+	l.openPrice = l.openPrice[1:]
+	l.openPrice = append(l.openPrice, marketData.OpenPrice)
+
+	volumePriceChange := marketData.ClosePrice - marketData.OpenPrice
+	l.deltaPrice = l.deltaPrice[1:]
+	l.deltaPrice = append(l.deltaPrice, volumePriceChange)
 }
 
 func (l *Levels) GetPotentialProfit(sell bool, targetPrice, currentPrice float64) float64 {

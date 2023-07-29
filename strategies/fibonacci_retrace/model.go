@@ -118,23 +118,6 @@ func (f *FibonacciRetrace) HandlerFunc(marketData *block.Data) {
 	}
 }
 
-func (f *FibonacciRetrace) TrailingStopLoss(marketData *block.Data) {
-	index := len(f.closePrice) - 1
-	closePrice := marketData.ClosePrice
-	prevClosePrice := f.closePrice[index-1]
-	if f.LastTrade.FuturesSide == futures.SideTypeBuy {
-		if closePrice > prevClosePrice {
-			delta := closePrice - prevClosePrice
-			f.StopLossPrice = f.StopLossPrice + delta
-		}
-	} else if f.LastTrade.FuturesSide == futures.SideTypeSell {
-		if closePrice < prevClosePrice {
-			delta := prevClosePrice - closePrice
-			f.StopLossPrice = f.StopLossPrice + delta
-		}
-	}
-}
-
 func (f *FibonacciRetrace) LoadData() error {
 	if f.StrategyInstance.Testing == testing.Disable {
 		client := futures.NewClient("", "")

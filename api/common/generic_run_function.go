@@ -14,11 +14,13 @@ import (
 	"newTradingBot/storage"
 	"newTradingBot/strategies/fibonacci_retrace"
 	"newTradingBot/strategies/levels"
+	"newTradingBot/strategies/regression_channels"
 )
 
 var NewStrategy = map[string]func(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error){
-	fibonacci_retrace.StrategyName: fibonacci_retrace.NewFibonacciRetrace,
-	levels.StrategyName:            levels.NewLevels,
+	fibonacci_retrace.StrategyName:   fibonacci_retrace.NewFibonacciRetrace,
+	levels.StrategyName:              levels.NewLevels,
+	regression_channels.StrategyName: regression_channels.NewLinearRegression,
 }
 
 func RunFunction(userID int, rawConfig []byte, test, strategyID int, strategyName string, sessionID *int) ([]*trade.Trade, *int, error) {

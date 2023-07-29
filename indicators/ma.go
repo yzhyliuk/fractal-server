@@ -67,6 +67,6 @@ func SimpleMA(observations []float64, period int) float64 {
 func ExponentialMA(period int, previousEMA, currentValue float64) float64 {
 	multiplier := float64(2) / float64(period+1)
 
-	ema := currentValue*multiplier + previousEMA*(1-multiplier)
+	ema := (currentValue * multiplier) + (previousEMA * (1 - multiplier))
 	return ema
 }

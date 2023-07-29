@@ -71,6 +71,11 @@ func (l *linearRegression) HandlerFunc(marketData *block.Data) {
 			_ = instance.UpdateStatus(db, l.StrategyInstance.ID, instance.StatusRunning)
 		}
 
+		if l.LastTrade != nil {
+			l.TrailingStopLoss(marketData)
+			return
+		}
+
 		slope, intercept := indicators.LinearRegressionForTimeSeries(l.closePriceObservations)
 
 		linearMean := intercept + slope*float64(l.config.Period)
@@ -99,64 +104,59 @@ func (l *linearRegression) Evaluate(marketData *block.Data, upLinear, lowLinear,
 		targetDown = marketData.Low
 	}
 
-	// handle exit
-	if l.LastTrade != nil {
-		exitTargetUp := marketData.High
-		exitTargetDown := marketData.Low
-		takeProfitSell := l.LastTrade.FuturesSide == futures.SideTypeSell && exitTargetDown < l.TakeProfitPrice
-		takeProfitBuy := l.LastTrade.FuturesSide == futures.SideTypeBuy && exitTargetUp > l.TakeProfitPrice
+	//// handle exit
+	//if l.LastTrade != nil {
+	//	exitTargetUp := marketData.High
+	//	exitTargetDown := marketData.Low
+	//	takeProfitSell := l.LastTrade.FuturesSide == futures.SideTypeSell && exitTargetDown < l.TakeProfitPrice
+	//	takeProfitBuy := l.LastTrade.FuturesSide == futures.SideTypeBuy && exitTargetUp > l.TakeProfitPrice
+	//
+	//	stopLossSell := l.LastTrade.FuturesSide == futures.SideTypeSell && exitTargetUp > l.StopLossPrice
+	//	stopLossBuy := l.LastTrade.FuturesSide == futures.SideTypeBuy && exitTargetDown < l.StopLossPrice
+	//
+	//	if takeProfitSell || takeProfitBuy || stopLossSell || stopLossBuy {
+	//		l.CloseAllTrades()
+	//	}
+	//	return
+	//}
 
-		stopLossSell := l.LastTrade.FuturesSide == futures.SideTypeSell && exitTargetUp > l.StopLossPrice
-		stopLossBuy := l.LastTrade.FuturesSide == futures.SideTypeBuy && exitTargetDown < l.StopLossPrice
-
-		if takeProfitSell || takeProfitBuy || stopLossSell || stopLossBuy {
-			l.CloseAllTrades()
-		}
-		return
-	}
-
-	if lowLinear > targetDown && lowRegular > targetDown {
-		l.breakDown = true
-		return
-	} else if upLinear < targetUp && upRegular < targetUp {
-		l.breakUp = true
-		return
-	}
-
-	if upLinear > targetUp && l.breakUp {
-		profit := l.GetPotentialProfit(true, linearMean, targetUp)
-		if profit < 0.025 {
-			return
+	if upLinear < targetUp {
+		err := l.HandleSell(marketData)
+		if err != nil {
+			logs.LogError(err)
 		}
 
-		l.breakUp = false
+		l.StopLossPrice = marketData.ClosePrice + (marketData.ClosePrice * (l.StrategyInstance.TradeStopLoss / float64(*l.StrategyInstance.Leverage)))
+
+		return
+	} else if lowLinear > targetDown {
+
 		err := l.HandleBuy(marketData)
 		if err != nil {
 			logs.LogError(err)
 		}
 
-		l.TakeProfitPrice = linearMean
-		l.StopLossPrice = marketData.ClosePrice + ((marketData.ClosePrice - linearMean) / 2)
-
-		return
-	} else if lowLinear < targetDown && l.breakDown {
-		profit := l.GetPotentialProfit(true, linearMean, targetUp)
-		if profit < 0.025 {
-			return
-		}
-
-		l.breakDown = false
-		err := l.HandleBuy(marketData)
-		if err != nil {
-			logs.LogError(err)
-		}
-
-		l.TakeProfitPrice = linearMean
-		l.StopLossPrice = marketData.ClosePrice - ((linearMean - marketData.ClosePrice) / 2)
+		l.StopLossPrice = marketData.ClosePrice - (marketData.ClosePrice * (l.StrategyInstance.TradeStopLoss / float64(*l.StrategyInstance.Leverage)))
 
 		return
 	}
 
+}
+func (l *linearRegression) TrailingStopLoss(marketData *block.Data) {
+	index := len(l.closePriceObservations) - 1
+	closePrice := marketData.ClosePrice
+	prevClosePrice := l.closePriceObservations[index-1]
+	if l.LastTrade.FuturesSide == futures.SideTypeBuy {
+		if closePrice > prevClosePrice {
+			delta := closePrice - prevClosePrice
+			l.StopLossPrice = l.StopLossPrice + delta
+		}
+	} else if l.LastTrade.FuturesSide == futures.SideTypeSell {
+		if closePrice < prevClosePrice {
+			delta := prevClosePrice - closePrice
+			l.StopLossPrice = l.StopLossPrice + delta
+		}
+	}
 }
 
 func (l *linearRegression) ProcessData(marketData *block.Data) {
