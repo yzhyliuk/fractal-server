@@ -123,10 +123,10 @@ func GetBinanceData(db *gorm.DB, pair string, userID, timeframe, numberOfTimeFra
 
 func formatTimeFrameToInterval(timeFrame int) (string, error) {
 	defaultMark := "m"
-	if timeFrame > 60 {
+	if timeFrame >= 60 {
 		// minutes
 		timeFrame = timeFrame / 60
-		if timeFrame > 60 {
+		if timeFrame >= 60 {
 			// hours
 			timeFrame = timeFrame / 60
 			defaultMark = "h"

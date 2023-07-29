@@ -19,9 +19,9 @@ import (
 	"strconv"
 )
 
-type FibonacciRetrace struct {
+type FibonacciRetraceWithLevels struct {
 	common.Strategy
-	config FibonacciRetraceConfig
+	config FibonacciRetraceWithLevelsConfig
 
 	lowPrice   []float64
 	highPrice  []float64
@@ -38,15 +38,15 @@ type FibonacciRetrace struct {
 	breakUp  bool
 }
 
-const StrategyName = "fibonacci_retrace"
+const StrategyName = "fibonacci_retrace_with_levels"
 const UpTrend = "UP"
 const DownTrend = "Down"
 const NoTrend = "Flat"
 
-// NewFibonacciRetrace - creates new FibonacciRetrace crossover strategy
+// NewFibonacciRetrace - creates new FibonacciRetraceWithLevels crossover strategy
 func NewFibonacciRetrace(monitorChannel chan *block.Data, configRaw []byte, keys *users.Keys, historicalData []*block.Data, inst *instance.StrategyInstance) (strategy.Strategy, error) {
 
-	var config FibonacciRetraceConfig
+	var config FibonacciRetraceWithLevelsConfig
 
 	err := json.Unmarshal(configRaw, &config)
 	if err != nil {
@@ -65,7 +65,7 @@ func NewFibonacciRetrace(monitorChannel chan *block.Data, configRaw []byte, keys
 		return nil, err
 	}
 
-	newStrategy := &FibonacciRetrace{
+	newStrategy := &FibonacciRetraceWithLevels{
 		config: config,
 	}
 	newStrategy.Account = acc
@@ -87,7 +87,7 @@ func NewFibonacciRetrace(monitorChannel chan *block.Data, configRaw []byte, keys
 	return newStrategy, nil
 }
 
-func (f *FibonacciRetrace) HandlerFunc(marketData *block.Data) {
+func (f *FibonacciRetraceWithLevels) HandlerFunc(marketData *block.Data) {
 	if f.closePrice[0] != 0 {
 		if f.StrategyInstance.Status == instance.StatusCreated && f.StrategyInstance.Testing == testing.Disable {
 			f.StrategyInstance.Status = instance.StatusRunning
@@ -143,7 +143,7 @@ func (f *FibonacciRetrace) HandlerFunc(marketData *block.Data) {
 	}
 }
 
-func (f *FibonacciRetrace) TrailingStopLoss(marketData *block.Data) {
+func (f *FibonacciRetraceWithLevels) TrailingStopLoss(marketData *block.Data) {
 	index := len(f.closePrice) - 1
 	closePrice := marketData.ClosePrice
 	prevClosePrice := f.closePrice[index-1]
@@ -160,7 +160,7 @@ func (f *FibonacciRetrace) TrailingStopLoss(marketData *block.Data) {
 	}
 }
 
-func (f *FibonacciRetrace) LoadData() error {
+func (f *FibonacciRetraceWithLevels) LoadData() error {
 	if f.StrategyInstance.Testing == testing.Disable {
 		client := futures.NewClient("", "")
 		tf := f.config.TimeFrame / 60
@@ -190,7 +190,7 @@ func (f *FibonacciRetrace) LoadData() error {
 	return nil
 }
 
-func (f *FibonacciRetrace) GetCurrentTrend(marketData *block.Data) string {
+func (f *FibonacciRetraceWithLevels) GetCurrentTrend(marketData *block.Data) string {
 	mean := indicators.Average(f.closePrice)
 
 	if mean < marketData.ClosePrice {
@@ -217,7 +217,7 @@ func (f *FibonacciRetrace) GetCurrentTrend(marketData *block.Data) string {
 
 }
 
-func (f *FibonacciRetrace) CustomVariableTakeProfit(marketData *block.Data) {
+func (f *FibonacciRetraceWithLevels) CustomVariableTakeProfit(marketData *block.Data) {
 	if f.LastTrade == nil {
 		return
 	}
@@ -238,7 +238,7 @@ func (f *FibonacciRetrace) CustomVariableTakeProfit(marketData *block.Data) {
 	}
 }
 
-func (f *FibonacciRetrace) ProcessData(marketData *block.Data) {
+func (f *FibonacciRetraceWithLevels) ProcessData(marketData *block.Data) {
 	f.lowPrice = f.lowPrice[1:]
 	f.lowPrice = append(f.lowPrice, marketData.Low)
 
@@ -249,7 +249,7 @@ func (f *FibonacciRetrace) ProcessData(marketData *block.Data) {
 	f.closePrice = append(f.closePrice, marketData.ClosePrice)
 }
 
-func (f *FibonacciRetrace) GetPotentialProfit(sell bool, targetPrice, currentPrice float64) float64 {
+func (f *FibonacciRetraceWithLevels) GetPotentialProfit(sell bool, targetPrice, currentPrice float64) float64 {
 	if sell {
 		return (currentPrice / targetPrice) - 1
 	} else {

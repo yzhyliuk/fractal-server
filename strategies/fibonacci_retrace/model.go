@@ -30,6 +30,9 @@ type FibonacciRetrace struct {
 
 	trendBarsCounter int
 	prevTrend        string
+
+	potentialTPPrice float64
+	trailingIsReady  bool
 }
 
 const StrategyName = "fibonacci_retrace"
@@ -86,6 +89,12 @@ func (f *FibonacciRetrace) HandlerFunc(marketData *block.Data) {
 			_ = instance.UpdateStatus(db, f.StrategyInstance.ID, instance.StatusRunning)
 		}
 
+		if f.LastTrade == nil {
+			f.trailingIsReady = false
+		} else if f.LastTrade != nil && f.trailingIsReady {
+			f.TrailingStopLoss(marketData)
+		}
+
 		trend := f.GetCurrentTrend(marketData)
 
 		bbClosePrices := f.closePrice[f.config.MALength-f.config.BBLength:]
@@ -100,38 +109,31 @@ func (f *FibonacciRetrace) HandlerFunc(marketData *block.Data) {
 		fibRetraceH := priceHigh - ((priceHigh - priceLow) * f.config.FibonacciLevel)
 		fibRetraceL := priceLow + ((priceHigh - priceLow) * f.config.FibonacciLevel)
 
-		if marketData.ClosePrice < bbLower && trend == UpTrend {
+		if marketData.ClosePrice < bbLower && trend == DownTrend {
 			err := f.HandleBuy(marketData)
 			if err != nil {
 				logs.LogError(err)
 			}
-			f.TakeProfitPrice = fibRetraceH
+			f.potentialTPPrice = fibRetraceH
 		}
 
-		if marketData.ClosePrice > bbUpper && trend == DownTrend {
+		if marketData.ClosePrice > bbUpper && trend == UpTrend {
 			err := f.HandleSell(marketData)
 			if err != nil {
 				logs.LogError(err)
 			}
-			f.TakeProfitPrice = fibRetraceL
+			f.potentialTPPrice = fibRetraceL
 		}
 	}
 }
 
-func (f *FibonacciRetrace) TrailingStopLoss(marketData *block.Data) {
-	index := len(f.closePrice) - 1
-	closePrice := marketData.ClosePrice
-	prevClosePrice := f.closePrice[index-1]
-	if f.LastTrade.FuturesSide == futures.SideTypeBuy {
-		if closePrice > prevClosePrice {
-			delta := closePrice - prevClosePrice
-			f.StopLossPrice = f.StopLossPrice + delta
-		}
-	} else if f.LastTrade.FuturesSide == futures.SideTypeSell {
-		if closePrice < prevClosePrice {
-			delta := prevClosePrice - closePrice
-			f.StopLossPrice = f.StopLossPrice + delta
-		}
+func (f *FibonacciRetrace) VariableTP(marketData *block.Data) {
+	conditionSell := f.LastTrade.FuturesSide == futures.SideTypeSell && marketData.ClosePrice < f.potentialTPPrice
+	conditionBuy := f.LastTrade.FuturesSide == futures.SideTypeBuy && marketData.ClosePrice > f.potentialTPPrice
+
+	if conditionSell || conditionBuy {
+		f.StopLossPrice = f.potentialTPPrice
+		f.trailingIsReady = true
 	}
 }
 
