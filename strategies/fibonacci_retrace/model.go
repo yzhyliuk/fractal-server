@@ -30,9 +30,6 @@ type FibonacciRetrace struct {
 
 	trendBarsCounter int
 	prevTrend        string
-
-	potentialTPPrice float64
-	trailingIsReady  bool
 }
 
 const StrategyName = "fibonacci_retrace"
@@ -89,12 +86,6 @@ func (f *FibonacciRetrace) HandlerFunc(marketData *block.Data) {
 			_ = instance.UpdateStatus(db, f.StrategyInstance.ID, instance.StatusRunning)
 		}
 
-		if f.LastTrade == nil {
-			f.trailingIsReady = false
-		} else if f.LastTrade != nil && f.trailingIsReady {
-			f.TrailingStopLoss(marketData)
-		}
-
 		trend := f.GetCurrentTrend(marketData)
 
 		bbClosePrices := f.closePrice[f.config.MALength-f.config.BBLength:]
@@ -109,31 +100,21 @@ func (f *FibonacciRetrace) HandlerFunc(marketData *block.Data) {
 		fibRetraceH := priceHigh - ((priceHigh - priceLow) * f.config.FibonacciLevel)
 		fibRetraceL := priceLow + ((priceHigh - priceLow) * f.config.FibonacciLevel)
 
-		if marketData.ClosePrice < bbLower && trend == DownTrend {
+		if marketData.ClosePrice < bbLower && trend == UpTrend {
 			err := f.HandleBuy(marketData)
 			if err != nil {
 				logs.LogError(err)
 			}
-			f.potentialTPPrice = fibRetraceH
+			f.TakeProfitPrice = fibRetraceH
 		}
 
-		if marketData.ClosePrice > bbUpper && trend == UpTrend {
+		if marketData.ClosePrice > bbUpper && trend == DownTrend {
 			err := f.HandleSell(marketData)
 			if err != nil {
 				logs.LogError(err)
 			}
-			f.potentialTPPrice = fibRetraceL
+			f.TakeProfitPrice = fibRetraceL
 		}
-	}
-}
-
-func (f *FibonacciRetrace) VariableTP(marketData *block.Data) {
-	conditionSell := f.LastTrade.FuturesSide == futures.SideTypeSell && marketData.ClosePrice < f.potentialTPPrice
-	conditionBuy := f.LastTrade.FuturesSide == futures.SideTypeBuy && marketData.ClosePrice > f.potentialTPPrice
-
-	if conditionSell || conditionBuy {
-		f.StopLossPrice = f.potentialTPPrice
-		f.trailingIsReady = true
 	}
 }
 
